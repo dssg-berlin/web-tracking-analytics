@@ -1,0 +1,2 @@
+# Preparation
+[wirfuervielfalt.de](https://www.wirfuervielfalt.de/) uses [Matomo](https://matomo.org/) which is the most common free and open source web analytics application to track online visits to one or more websites and display reports on these visits for analysis.
