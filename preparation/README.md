@@ -53,3 +53,7 @@ https://teachtofishdigital.com/web-analytics-questions/
 * Fathom
 * Hotjar
 * WP-Statistics
+
+## Matomo Heatmap Demo
+
+![image](https://user-images.githubusercontent.com/8211411/222895767-1a8f8bb4-4037-4a78-bed6-e625fcbf3ac5.png)
