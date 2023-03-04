@@ -4,6 +4,15 @@
 * [How do I make the Matomo Analytics RAW data available to my data warehouse?](https://matomo.org/faq/how-to/faq_24536/)
 * [How do I export the Raw data from Matomo (users, actions, clicks)?](https://matomo.org/faq/how-to/faq_24574/)
 
+## Matomo Demo
+https://demo.matomo.cloud/
+
+### Matomo Heatmap Demo
+![image](https://user-images.githubusercontent.com/8211411/222895767-1a8f8bb4-4037-4a78-bed6-e625fcbf3ac5.png)
+
+### Matomo Demo Data
+https://github.com/dssg-berlin/web-tracking-analytics/releases/tag/preparation
+
 ## Data Challenges
 https://teachtofishdigital.com/web-analytics-questions/
 
@@ -53,7 +62,3 @@ https://teachtofishdigital.com/web-analytics-questions/
 * Fathom
 * Hotjar
 * WP-Statistics
-
-## Matomo Heatmap Demo
-
-![image](https://user-images.githubusercontent.com/8211411/222895767-1a8f8bb4-4037-4a78-bed6-e625fcbf3ac5.png)
