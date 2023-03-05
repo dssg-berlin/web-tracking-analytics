@@ -101,7 +101,7 @@ https://learndigital.withgoogle.com/assets/media/pdf/10-web-analytics-glossary.p
 * Include Project Counter
 * Correct typos:
 
-	'<img alt="twitter" title="twitter" src="/img/linkedin.svg" class="twitter">
-	<a href="https://www.linkedin.com/company/54338698/" title="linkedin" class="xsbbLabel"><img alt="twitter" title="twitter" src="/img/linkedinhell.svg" class="icons"></a>'
-	'<a href="https://www.betterplace.org/de/projects/91900?utm_campaign=user_share&amp;utm_medium=ppp_sticky&amp;utm_source=Link" title="spenden" class="xsbbLabel"><img alt="youtube" title="spenden" src="/img/SpendenButtonDesktop.svg" class="spendeicon"></a>'
-	'<div data-v-7f0f8cef="" data-v-44845210="" class="vel-img-title">Vorstellung einer Präsenatation vom Diplom-Pädagogen Ants Kiel</div>'
+	'''<img alt="twitter" title="twitter" src="/img/linkedin.svg" class="twitter">
+	<a href="https://www.linkedin.com/company/54338698/" title="linkedin" class="xsbbLabel"><img alt="twitter" title="twitter" src="/img/linkedinhell.svg" class="icons"></a>'''
+	'''<a href="https://www.betterplace.org/de/projects/91900?utm_campaign=user_share&amp;utm_medium=ppp_sticky&amp;utm_source=Link" title="spenden" class="xsbbLabel"><img alt="youtube" title="spenden" src="/img/SpendenButtonDesktop.svg" class="spendeicon"></a>'''
+	'''<div data-v-7f0f8cef="" data-v-44845210="" class="vel-img-title">Vorstellung einer Präsenatation vom Diplom-Pädagogen Ants Kiel</div>'''
