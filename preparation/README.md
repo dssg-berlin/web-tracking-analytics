@@ -12,6 +12,13 @@
 * more than 100 projects
 * more than 2 years
 
+## Besucher Log File
+
+* From August 3 2022 to March 8 2023
+* 1635 data rows and 1403 columns
+
+https://github.com/dssg-berlin/web-tracking-analytics/blob/main/preparation/explore_data.ipynb
+
 ## Matomo Demo
 https://demo.matomo.cloud/
 
