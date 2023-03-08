@@ -16,6 +16,7 @@
 
 * From August 3 2022 to March 8 2023
 * 1635 data rows and 1403 columns
+* What does each column stand for?
 
 https://github.com/dssg-berlin/web-tracking-analytics/blob/main/preparation/explore_data.ipynb
 
