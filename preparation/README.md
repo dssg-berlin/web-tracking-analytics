@@ -34,33 +34,33 @@ Note that Matomo encodes csv files using utf-16le encoding. https://github.com/m
 ## Data Challenges
 https://teachtofishdigital.com/web-analytics-questions/
 
-* What is the purpose of the website. The purpose defines the conversion event.
-* Which message does the website send its visitors.
+* What is the purpose of the website. The purpose defines the conversion event?
+* Which message does the website send its visitors?
 
 ### Visitors
-* What are the most common devices and browsers used that should be the focus for UI optimization and accessibility efforts?
-* Are there patterns of visitor return/retention or duration of stay with page content or other features?
-* Do sources or webpages correlate with visit duration?
-* How many visits to the site? How many unique visitors?
+- ~~What are the most common devices and browsers used that should be the focus for UI optimization and accessibility efforts?~~
+- [x] Are there patterns of visitor return/retention or duration of stay with page content or other features?
+- [x] Do sources or webpages correlate with visit duration?
+- [x] How many visits to the site? How many unique visitors?
 
 ### Sources
-* Where are the visitors referred from: direct/search engine/email(i.e. newsletter)/social media? How do visitors find the website? Which sources are underrepresented and could attract additional visitors?
-* What are the search engine keywords that lead visitors to the website? https://matomo.org/faq/search-engine-keywords-performance/faq_23862/
+- ~~Where are the visitors referred from: direct/search engine/email(i.e. newsletter)/social media? How do visitors find the website? Which sources are underrepresented and could attract additional visitors?~~
+- [ ] What are the search engine keywords that lead visitors to the website? https://matomo.org/faq/search-engine-keywords-performance/faq_23862/
 
 ### Content
-* What are the top landing pages? What are the keywords of the top landing pages? 
-* What are the top keywords by location? Are there other locations with similar interest as indicated by keywords?
-* Is there a change of top landing pages over time? Does the interest shift?
-* Which pages have a high exit rate?
-* What pages are most visited?
-* What pages trigger conversion action?
-* What are the loading speeds?
+- [x] What are the top landing pages? What are the keywords of the top landing pages? 
+- [ ] What are the top keywords by location? Are there other locations with similar interest as indicated by keywords?
+- [x] Is there a change of top landing pages over time? Does the interest shift?
+- [x] Which pages have a high exit rate?
+- [x] What pages are most visited?
+- [x] What pages trigger conversion action?
+- [x] What are the loading speeds?
 
 ### Actions/Conversions
-* Is the recent tracking sufficient/fitting the purpose?
-* What is the conversion rate (conversions/visitors)?
-* What are the most common conversion paths?
-* What is the average number of visits required before a visitor converts?
+- [x] Is the recent tracking sufficient/fitting the purpose?
+- [x] What is the conversion rate (conversions/visitors)?
+- [x] What are the most common conversion paths?
+- [x] What is the average number of visits required before a visitor converts?
 * Suggested conversion: click on betterplace donation link, "projekt anbieten", referring to a listed project, 
 
 ## Data Scheme
@@ -103,6 +103,10 @@ https://learndigital.withgoogle.com/assets/media/pdf/10-web-analytics-glossary.p
 
 * https://analytics.google.com/analytics/academy/
 * https://experienceleague.adobe.com/
+
+## Other sources
+
+* https://www.udotrautmann.de/category/matomo/matomo-tracking/
 
 ## Recommendations
 
