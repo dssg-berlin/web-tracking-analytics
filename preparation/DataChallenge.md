@@ -35,9 +35,10 @@ https://teachtofishdigital.com/web-analytics-questions/
 - [x] What are the most common conversion paths?
 - [x] What is the average number of visits required before a visitor converts?
 
-### Colaboration
+### Collaboration
 
 * working locally
+* [GitHub Codespaces](https://github.com/features/codespaces), ... other online environments
 
 ### Results
 
