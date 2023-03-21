@@ -6,11 +6,12 @@ https://www.wirfuervielfalt.de/
 ## Data Challenge
 
 ### Recommended Skills
-* Analytic tool of your choice (Python, R, ...)
+* Analytic Tool of your Choice (Python, R, ...)
 * Working with Tabular Data
 * Visualization
 * Working with Time Series Data
 * Basic Knowledge on Web Technology
+* Basic NLP to Identify Keywords of a Document
 
 ### Group 1) Visitors
 - [ ] Are there patterns of visitor return/retention or duration of stay with page content or other features?
@@ -18,7 +19,7 @@ https://www.wirfuervielfalt.de/
 - [ ] How many visits to the site? How many unique visitors?
 
 ### Group 2) Sources
-- [ ] Where are the visitors referred from?
+- [ ] Where are the visitors referred (search engines/social media) from?
 
 ### Group 3) Content
 - [ ] What are the top landing pages? What are the keywords of the top landing pages? 
@@ -37,7 +38,7 @@ https://www.wirfuervielfalt.de/
 
 ### Collaboration
 * Working locally
-* Working with the Cloud Application of your choice
+* Working with the Cloud Application of your Choice
 
 ### Results
 * Presentation, Slides, Charts
