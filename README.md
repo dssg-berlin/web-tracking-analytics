@@ -17,7 +17,7 @@ https://www.wirfuervielfalt.de/
 - [ ] Do sources or webpages correlate with visit duration?
 - [ ] How many visits to the site? How many unique visitors?
 
-### 2) Sources
+### Group 2) Sources
 - [ ] Where are the visitors referred from?
 
 ### Group 3) Content
@@ -35,19 +35,13 @@ https://www.wirfuervielfalt.de/
 - [ ] What are the most common conversion paths?
 - [ ] What is the average number of visits required before a visitor converts?
 
-### Colaboration
-
-* working locally
+### Collaboration
+* Working locally
+* Working with the Cloud Application of your choice
 
 ### Results
-
 * Presentation, Slides, Charts
 * Interpretation and Messages, Recommendations/Conclusions based on Data
-
-### Other
-* What is the purpose of the website. The purpose defines the conversion event?
-* Which message does the website send its visitors?
-* Suggested conversion: click on betterplace donation link, click "projekt anbieten", referring to a listed project, ...
 
 ### Reference
 https://teachtofishdigital.com/web-analytics-questions/
