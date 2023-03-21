@@ -4,6 +4,7 @@ Third project for the 2023 Datathon. It's a project with the non-profit organisa
 https://www.wirfuervielfalt.de/
 
 ## Data Challenge
+GDrive Folder containing the Data and Info Sheet: https://drive.google.com/drive/folders/18DvG7Eih3ycBAF8OZEbjaYFyAqrCZGeb
 
 ### Recommended Skills
 * Analytic Tool of your Choice (Python, R, ...)
