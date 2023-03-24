@@ -20,7 +20,8 @@ GDrive Folder containing the Data and Info Sheet: https://drive.google.com/drive
 - [ ] How many visits to the site? How many unique visitors?
 
 ### Group 2) Sources
-- [ ] Where are the visitors referred (search engines/social media) from?
+- [ ] Visualize the referring sources (search engines/social media).
+- [ ] Calculate the Bounce Rate (single-page sessions divided by all sessions).
 
 ### Group 3) Content
 - [ ] What are the top landing pages? What are the keywords of the top landing pages? 
@@ -32,10 +33,10 @@ GDrive Folder containing the Data and Info Sheet: https://drive.google.com/drive
 - [ ] What are the loading speeds?
 
 ### Group 4) Actions/Conversions
-- [ ] Is the recent tracking sufficient/fitting the purpose?
 - [ ] What is the conversion rate (conversions/visitors)?
 - [ ] What are the most common conversion paths?
-- [ ] What is the average number of visits required before a visitor converts?
+- [ ] What is the average number of visits/steps required before a visitor converts?
+- [ ] Is the recent tracking sufficient/fitting the purpose? Define possible Goals and check if the data contains the corresponding information.
 
 ### Collaboration
 * Working locally
