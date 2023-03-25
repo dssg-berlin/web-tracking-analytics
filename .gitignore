@@ -132,5 +132,5 @@ dmypy.json
 
 # Pipenv
 Pipfile.lock
-Pipenv
+Pipfile
 data/*
