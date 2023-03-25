@@ -1,0 +1,17 @@
+German	English
+Bezeichnung	Name
+Besuche	Visits
+Aktionen	Actions
+Maximale Aktionen pro Besuch	Maximum actions per visit
+Von Besuchern verbrachte Gesamtzeit (in Sekunden)	Total time spent by visitors (in seconds)
+Absprünge	Bounces
+Besuche mit Konversionen	Visits with conversions
+Eindeutige Besucher (Tagessumme)	Unique visitors (daily total)
+Benutzer (Tagessumme)	Users (daily total)
+Konversionen (Ziel idgoal=2)	Conversions (target idgoal=2)
+Besuche mit Konversionen (Ziel idgoal=2)	Visits with conversions (target idgoal=2)
+Umsatz (Ziel idgoal=2)	Sales (target idgoal=2)
+Konversionen	Conversions
+Umsatz	Sales
+Metadaten: segment	Metadata: segment
+Metadaten: referrer_type	Metadata: referrer_type

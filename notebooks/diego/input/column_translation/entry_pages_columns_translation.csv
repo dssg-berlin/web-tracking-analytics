@@ -1,0 +1,54 @@
+German	English
+Bezeichnung	Bezeichnung
+Besuche	Besuche
+Seitenansichten	Seitenansichten
+Von Besuchern verbrachte Gesamtzeit (in Sekunden)	Von Besuchern verbrachte Gesamtzeit (in Sekunden)
+nb_hits_with_time_network	nb_hits_with_time_network
+min_time_network	min_time_network
+max_time_network	max_time_network
+nb_hits_with_time_server	nb_hits_with_time_server
+min_time_server	min_time_server
+max_time_server	max_time_server
+nb_hits_with_time_transfer	nb_hits_with_time_transfer
+min_time_transfer	min_time_transfer
+max_time_transfer	max_time_transfer
+nb_hits_with_time_dom_processing	nb_hits_with_time_dom_processing
+min_time_dom_processing	min_time_dom_processing
+max_time_dom_processing	max_time_dom_processing
+nb_hits_with_time_dom_completion	nb_hits_with_time_dom_completion
+min_time_dom_completion	min_time_dom_completion
+max_time_dom_completion	max_time_dom_completion
+nb_hits_with_time_on_load	nb_hits_with_time_on_load
+min_time_on_load	min_time_on_load
+max_time_on_load	max_time_on_load
+Eingänge	Eingänge
+Aktionen nach Eintritt	Aktionen nach Eintritt
+Von Besuchern verbrachte Gesamtzeit (in Sekunden) nach Eintritt	Von Besuchern verbrachte Gesamtzeit (in Sekunden) nach Eintritt
+Absprünge	Absprünge
+Ausstiege	Ausstiege
+Konversionen (Ziel idgoal=2)	Konversionen (Ziel idgoal=2)
+Umsatz (Ziel idgoal=2)	Umsatz (Ziel idgoal=2)
+nb_conv_pages_before (Ziel idgoal=2)	nb_conv_pages_before (Ziel idgoal=2)
+nb_conversions_attrib (Ziel idgoal=2)	nb_conversions_attrib (Ziel idgoal=2)
+nb_conversions_page_rate (Ziel idgoal=2)	nb_conversions_page_rate (Ziel idgoal=2)
+nb_conversions_page_uniq (Ziel idgoal=2)	nb_conversions_page_uniq (Ziel idgoal=2)
+revenue_attrib (Ziel idgoal=2)	revenue_attrib (Ziel idgoal=2)
+revenue_entry (Ziel idgoal=2)	revenue_entry (Ziel idgoal=2)
+nb_conversions_entry_rate (Ziel idgoal=2)	nb_conversions_entry_rate (Ziel idgoal=2)
+revenue_per_entry (Ziel idgoal=2)	revenue_per_entry (Ziel idgoal=2)
+nb_conversions_entry (Ziel idgoal=2)	nb_conversions_entry (Ziel idgoal=2)
+Durchschn. Netzwerkzeit	Durchschn. Netzwerkzeit
+Durchschn. Serverzeit	Durchschn. Serverzeit
+Durchschn. Übertragungszeit	Durchschn. Übertragungszeit
+Durchschn. Zeit für DOM Prozessierung	Durchschn. Zeit für DOM Prozessierung
+Durchschn. Zeit für DOM Komplettierung	Durchschn. Zeit für DOM Komplettierung
+Durchschn. Ladezeit	Durchschn. Ladezeit
+Durchschn. Seitenladezeit	Durchschn. Seitenladezeit
+Durchschnittszeit pro Seite	Durchschnittszeit pro Seite
+Absprungsrate	Absprungsrate
+Ausstiegsrate	Ausstiegsrate
+Metadaten: segment	Metadaten: segment
+Eindeutige Besucher (Tagessumme)	Eindeutige Besucher (Tagessumme)
+Eindeutige Einstiege (Tagessumme)	Eindeutige Einstiege (Tagessumme)
+Eindeutige Ausstiege (Tagessumme)	Eindeutige Ausstiege (Tagessumme)
+Metadaten: url	Metadaten: url

@@ -1,0 +1,54 @@
+German	English
+Bezeichnung	Designation
+Eindeutige Seitenansichten	Unique side views
+Seitenansichten	Page views
+Von Besuchern verbrachte Gesamtzeit (in Sekunden)	Total time spent by visitors (in seconds)
+nb_hits_with_time_network	nb_hits_with_time_network
+min_time_network	min_time_network
+max_time_network	max_time_network
+nb_hits_with_time_server	nb_hits_with_time_server
+min_time_server	min_time_server
+max_time_server	max_time_server
+nb_hits_with_time_transfer	nb_hits_with_time_transfer
+min_time_transfer	min_time_transfer
+max_time_transfer	max_time_transfer
+nb_hits_with_time_dom_processing	nb_hits_with_time_dom_processing
+min_time_dom_processing	min_time_dom_processing
+max_time_dom_processing	max_time_dom_processing
+nb_hits_with_time_dom_completion	nb_hits_with_time_dom_completion
+min_time_dom_completion	min_time_dom_completion
+max_time_dom_completion	max_time_dom_completion
+nb_hits_with_time_on_load	nb_hits_with_time_on_load
+min_time_on_load	min_time_on_load
+max_time_on_load	max_time_on_load
+Eingänge	Inputs
+Aktionen nach Eintritt	Actions after entry
+Von Besuchern verbrachte Gesamtzeit (in Sekunden) nach Eintritt	Total time spent by visitors (in seconds) after entry
+Absprünge	Exits
+Ausstiege	Exits
+Konversionen (Ziel idgoal=2)	Conversions (target idgoal=2)
+Umsatz (Ziel idgoal=2)	Sales (target idgoal=2)
+nb_conv_pages_before (Ziel idgoal=2)	nb_conv_pages_before (target idgoal=2)
+nb_conversions_attrib (Ziel idgoal=2)	nb_conversions_attrib (target idgoal=2)
+nb_conversions_page_rate (Ziel idgoal=2)	nb_conversions_page_rate (target idgoal=2)
+nb_conversions_page_uniq (Ziel idgoal=2)	nb_conversions_page_uniq (target idgoal=2)
+revenue_attrib (Ziel idgoal=2)	revenue_attrib (target idgoal=2)
+revenue_entry (Ziel idgoal=2)	revenue_entry (target idgoal=2)
+nb_conversions_entry_rate (Ziel idgoal=2)	nb_conversions_entry_rate (target idgoal=2)
+revenue_per_entry (Ziel idgoal=2)	revenue_per_entry (target idgoal=2)
+nb_conversions_entry (Ziel idgoal=2)	nb_conversions_entry (target idgoal=2)
+Durchschn. Netzwerkzeit	Average network time Network time
+Durchschn. Serverzeit	Average server time
+Durchschn. Übertragungszeit	Average transmission time
+Durchschn. Zeit für DOM Prozessierung	Average time for DOM processing
+Durchschn. Zeit für DOM Komplettierung	Average time for DOM completion
+Durchschn. Ladezeit	Average load time
+Durchschn. Seitenladezeit	Average page load time
+Durchschnittszeit pro Seite	Average time per page
+Absprungsrate	Exit rate
+Ausstiegsrate	Exit rate
+Metadaten: segment	Metadata: segment
+Eindeutige Besucher (Tagessumme)	Unique visitors (daily total)
+Eindeutige Einstiege (Tagessumme)	Unique entrances (daily total)
+Eindeutige Ausstiege (Tagessumme)	Unique exits (daily total)
+Metadaten: url	Metadata: url
