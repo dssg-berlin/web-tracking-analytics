@@ -1,0 +1,835 @@
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Graph Editor</title>
+  <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <script type="text/javascript">
+
+    var node_params;
+    var mynodes = [];
+    var mylinks = [];
+
+
+    let maxDegree = 0;
+    let maxWeigth = 0;
+    let width = 800;
+    let height = 800;
+
+
+    function initialize(initNodes, initNodeParams, initLinks) {
+      mynodes = initNodes;
+      node_params = initNodeParams;
+      mylinks = initLinks;
+
+      if (!0) {
+        
+        let rawNodes = [];
+
+        let delta = 0.1;
+        for (i = 0; i < mynodes.length; i++) {
+          let newRawNode = null;
+
+          //fixing correct positions for target nodes
+          if (mynodes[i].type == 'bad_node') {
+            newRawNode = {
+              'index': mynodes[i].index,
+              'name': mynodes[i].name,
+              'type': mynodes[i].type,
+              'degree': mynodes[i].degree,
+              'fx': width * (1 - delta),
+              'fy': height / 2
+            };
+          } else if (mynodes[i].type == 'nice_node') {
+            newRawNode = {
+              'index': mynodes[i].index,
+              'name': mynodes[i].name,
+              'type': mynodes[i].type,
+              'degree': mynodes[i].degree,
+              'fx': width * delta,
+              'fy': height / 2
+            };
+          } else {
+            //for non-target nodes there x-s and y-s will be added after forceSimulation
+            newRawNode = {
+              'index': mynodes[i].index,
+              'name': mynodes[i].name,
+              'type': mynodes[i].type,
+              'degree': mynodes[i].degree
+            };
+          }
+          //needed for normalization later
+          if (mynodes[i].degree > maxDegree) {
+            maxDegree = mynodes[i].degree;
+          }
+
+          rawNodes.push(newRawNode);
+        }
+        
+        var layout = d3
+          .forceSimulation(rawNodes)
+          .tick(5)
+          ;
+
+
+        let maxX = 0,
+            maxY = 0,
+            minX = 0,
+            minY = 0;
+
+        for (let i = 0; i < rawNodes.length; i++) {
+          if (rawNodes[i].type == 'suit_node') {
+            if (rawNodes[i].x > maxX) {
+              maxX = rawNodes[i].x;
+            }
+            if (rawNodes[i].x < minX) {
+              minX = rawNodes[i].x;
+            }
+            if (rawNodes[i].y > maxY) {
+              maxY = rawNodes[i].y;
+            }
+            if (rawNodes[i].y < minY) {
+              minY = rawNodes[i].y;
+            }
+          }
+        }
+
+        let offsetMaxX = -minX + maxX;
+        let offsetMaxY = -minY + maxY;
+
+        //Coordinates now have some unpredicted values. I set them so they fill my viewbox with some padding from borders.
+        //At first I normalize them, then multiply by width and height.
+
+        for (let i = 0; i < rawNodes.length; i++) {
+
+          if (rawNodes[i].type == 'suit_node') {
+            //x, y >= 0
+            rawNodes[i].x += -minX;
+            rawNodes[i].y += -minY;
+
+            //x, y from [0, 1 - 2 * delta]
+            rawNodes[i].x = rawNodes[i].x / offsetMaxX * (1 - 2 * delta);
+            rawNodes[i].y = rawNodes[i].y / offsetMaxY * (1 - 2 * delta);
+
+            //x, y from [delta, 1 - delta]
+            rawNodes[i].x += delta;
+            rawNodes[i].y += delta;
+
+            //x, y from [(width | height) * delta, (width | height) * (1 - delta)]
+
+            rawNodes[i].x *= width;
+            rawNodes[i].y *= height;
+
+          }
+
+        }
+
+        for (let i = 0; i < mynodes.length; i++) {
+          mynodes[i].x = rawNodes[i].x;
+          mynodes[i].y = rawNodes[i].y;
+        }
+
+        for (let i = 0; i < mylinks.length;  i++) {
+          mylinks[i].source.x = rawNodes[mylinks[i].source.index].x;
+          mylinks[i].source.y = rawNodes[mylinks[i].source.index].y;
+          mylinks[i].target.x = rawNodes[mylinks[i].target.index].x;
+          mylinks[i].target.y = rawNodes[mylinks[i].target.index].y;
+          if (mylinks[i].weight > maxWeigth) {
+            maxWeigth = mylinks[i].weight;
+          }
+        }
+      } else {
+        // if layout_dump was used:
+        for (i = 0; i < mynodes.length; i++) {
+          if (mynodes[i].degree > maxDegree) {
+            maxDegree = mynodes[i].degree;
+          }
+        }
+        for (let i = 0; i < mylinks.length;  i++) {
+          if (mylinks[i].weight > maxWeigth) {
+            maxWeigth = mylinks[i].weight;
+          }
+        } 
+      }
+
+      
+      
+      
+      makeCheckboxes();
+      setLinkThreshold();
+      displayingWeights();
+    }
+
+    function drawGraph(nodes, links) {
+      zoom = d3.zoom()
+          .scaleExtent([0.5, 8])
+          .translateExtent([[0, 0], [width, height]])
+          .extent([[0, 0], [width, height]])
+          .on("zoom", zoomed)
+          ;
+
+      var svg = d3.select("#freakingGraph").append("svg")
+        .attr("viewBox", [0, 0, width, height])
+        .call(zoom)
+        ;
+
+      //I append all elemets to maingroup so zoom works properly
+      var maingroup = svg.append('g');
+
+      function zoomed() {
+        maingroup.attr("transform", d3.event.transform);
+      }
+
+
+      function calcMarkers(d) {
+
+          let dist = Math.sqrt((nodes[whereEquals(d.target.index)].x - nodes[whereEquals(d.source.index)].x) ** 2 + (nodes[whereEquals(d.target.index)].y - nodes[whereEquals(d.source.index)].y) ** 2);
+          if (dist > 0 && dist <= 200){
+              return - Math.sqrt((0.5 - (d.target.degree ) / 2 / dist)) * (d.target.degree) / 2;
+
+          } else {
+              return 0;
+          }
+      }
+
+      var path = maingroup.append("g").selectAll("path")
+          .data(links)
+          .enter()
+          .append("path")
+          .attr("class", function(d) { return "link " + d.type; })
+          .attr("stroke-width", function(d) { return Math.max(d.weight * 20, 1); })
+          .attr("id", function(d,i) { return "link_"+i; })
+          .attr("d", linkArc)
+          ;
+
+      let textMarkersSelection = maingroup.append("g").selectAll("text")
+          .data(links)
+          .enter();
+
+      textMarkersSelection.append("text")
+          .style("font-size", "13px")
+          .attr("dy", "4.2px")
+          .append("textPath")
+          .attr("xlink:href", function(d,i) { return "#link_"+i; })
+          .attr("startOffset", "35%")
+          .text("➤")
+          ;
+
+      textMarkersSelection.append("text")
+          .style("font-size", "13px")
+          .attr("dy", "4.2px")
+          .append("textPath")
+          .attr("xlink:href", function(d,i) { return "#link_"+i; })
+          .attr("startOffset", "65%")
+          .text("➤")
+          ;
+
+      var edgetext = maingroup.append("g").selectAll("text")
+          .data(links)
+          .enter().append("text")
+          .append("textPath")
+          .attr("xlink:href",function(d,i){return "#link_"+i;})
+          .style("text-anchor","middle")
+          .attr("startOffset", "50%")
+          .attr("id", function(d,i) { return "node_text"+i; })
+          ;
+
+      function whereEquals(index) {
+        for (var i = 0; i < nodes.length; i++) {
+          if (index == nodes[i].index) {
+            return i;
+          }
+        }
+      }
+
+
+        function roundToSignificantFigures(num, n) {
+            if(num == 0) {
+                return 0;
+            }
+
+            d = Math.ceil(Math.log10(num < 0 ? -num: num));
+            power = n - d;
+
+            magnitude = Math.pow(10, power);
+            shifted = Math.round(num*magnitude);
+            return shifted/magnitude;
+        };
+
+
+
+      function displayingWeights() {
+        d3.selectAll("#show-weights").each(function(d) {
+          cb = d3.select(this);
+          if (cb.property("checked")) {
+            edgetext = edgetext.text(function(d) {
+                if ($('#show-percents')[0].checked) {
+                    if (d['weight_text'] > 1) {
+                      return d['weight_text']
+                    } else {
+                      return roundToSignificantFigures(d['weight_text'] * 100, 2) + "%";
+                    };
+                } else {
+                    if (d['weight_text'] > 1) {
+                      return d['weight_text']
+                    } else {
+                      return roundToSignificantFigures(d['weight_text'], 2);
+                    };
+                }
+            })
+          } else {
+            edgetext = edgetext.text(function(d) { return ; })
+          }
+
+
+        })
+      };
+
+
+
+        d3.selectAll("#show-weights").on("change", displayingWeights);
+        d3.selectAll("#show-percents").on("change", displayingWeights);
+
+        function dragstarted(d) {
+          d3.select(this).raise().classed("active", true);
+        }
+
+        function dragged(d) {
+          d3.select(this)
+          .attr("cx", d.x = d3.event.x)
+          .attr("cy", d.y = d3.event.y);
+        }
+
+        function dragended(d) {
+
+          d3.select(this).classed("active", false);
+          path = path.attr("d", linkArc);
+
+          text = text
+            .attr('x', function(d) { return d.x; })
+            .attr('y', function(d) { return d.y; })
+            ;
+          defs.attr("refY", function(d) { return calcMarkers(d); });
+          defs.append("path")
+            .attr("d", "M0,-5L10,0L0,5");
+        };
+
+        var circle = maingroup.append("g").selectAll("circle")
+            .data(nodes)
+            .enter().append("circle")
+            .attr("class", function(d) { return "circle " + d.type; })
+            .attr("r", function(d) { return d.degree; })
+            .attr('cx', function(d) { return d.x; })
+            .attr('cy', function(d) { return d.y; })
+            .style("cursor", "default")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+
+
+        var text = maingroup.append("g").selectAll("text")
+          .data(nodes)
+          .enter().append("text")
+          .attr('x', function(d) { return d.x; })
+          .attr('y', function(d) { return d.y; })
+          .attr('id', function(d) { return "node-name" + d.index })
+          .attr('class', 'node-name')
+          .text(function(d) { return d.name; })
+          ;
+
+        function linkArc(d) {
+          var dx = nodes[whereEquals(d.target.index)].x - nodes[whereEquals(d.source.index)].x,
+              dy = nodes[whereEquals(d.target.index)].y - nodes[whereEquals(d.source.index)].y,
+              dr = dx * dx + dy * dy;
+              dr = Math.sqrt(dr);
+            if (dr > 200) {
+              dr *= 5
+            } else {
+              dr /= 2
+            };
+            if (dr > 0) {
+              return "M" + nodes[whereEquals(d.source.index)].x + "," + nodes[whereEquals(d.source.index)].y + "A" + (dr * 1.1) + "," + (dr * 1.1) + " 0 0,1 " + nodes[whereEquals(d.target.index)].x + "," + nodes[whereEquals(d.target.index)].y;
+            }
+            else {
+              minRadius = 24;
+              radius = Math.max(minRadius, nodes[whereEquals(d.source.index)].degree);
+              return "M" + nodes[whereEquals(d.source.index)].x + "," + nodes[whereEquals(d.source.index)].y + "A" + radius + "," + radius + " 0 1,0 " + (nodes[whereEquals(d.target.index)].x + 0.1) + "," + (nodes[whereEquals(d.target.index)].y + 0.1);
+            }
+        }
+
+        //synch with 'show names' and 'show weights' checkboxes
+        displayingWeights();
+        changeNamesVisibility(document.getElementById("show-names").checked)
+    }
+
+
+
+    function changeLabel(curinput) {
+      document.getElementById('label' + curinput.id.substring(4)).innerHTML = curinput.value;
+      mynodes[whereEquals1(curinput.id.substring(4))].name = curinput.value;
+      $(curinput).attr('size', curinput.value.length + 2)
+    };
+
+    function whereEquals1(index) {
+      for (var i = 0; i < mynodes.length; i++) {
+        if (index == mynodes[i].index) {
+          return i;
+        }
+      }
+    }
+
+    function makeCheckboxes() {
+
+      for (var i = 0; i < mynodes.length; i++) {
+
+        var newDiv = document.createElement('div');
+        newDiv.id = '#checkdiv' + mynodes[i].index;
+        $( '#check-boxes' ).append(newDiv);
+
+        var newCheckbox = document.createElement('input');
+        newCheckbox.type = 'checkbox';
+        newCheckbox.id = 'checkbox' + mynodes[i].index;
+        newCheckbox.checked = true;
+        newCheckbox.className = 'checkbox-class node-checkbox';
+        $( newDiv ).append(newCheckbox);
+
+        var newNameInput = document.createElement('input');
+        newNameInput.id = 'name-input' + mynodes[i].index;
+        newNameInput.type = 'text';
+        newNameInput.value = mynodes[i].name;
+        $( newNameInput ).attr('size', newNameInput.value.length + 3);
+
+        $( newDiv ).append(newNameInput);
+        $( newNameInput ).on('keypress', updateName);
+
+      }
+    }
+
+    function updateName() {
+
+      document.getElementById('node-name' + this.id.substring(10)).innerHTML = this.value;
+      mynodes[this.id.substring(10)].name = this.value;
+      this.size = this.value.length + 3;
+
+    }
+
+    function getCorrectLinks(newIdx) {
+      var newLinks = [];
+      for (var i = 0; i < mylinks.length; i++) {
+        if (newIdx.includes(mylinks[i].source.index) && newIdx.includes(mylinks[i].target.index)) {
+          newLinks.push(mylinks[i]);
+        }
+      }
+      return newLinks;
+    }
+    function clearSVG() {
+      $( 'svg' ).remove();
+      $( '.node-edit' ).each(function() {
+        this.remove();
+      });
+    }
+    function changeNodes() {
+      var newNodes = [];
+      var newIdx = [];
+
+      $( '.node-checkbox' ).each(function(i, obj) {
+
+        if (this.checked) {
+          newNodes.push(mynodes[i]);
+          newIdx.push(mynodes[i].index);
+        }
+
+      });
+
+      var newLinks = getCorrectLinks(newIdx)
+
+
+      clearSVG();
+      drawGraph(newNodes, newLinks);
+    }
+
+    function setLinkThreshold () {
+      let idxInLinks = new Array(mynodes.length).fill(false);
+      let newLinks = [];
+
+      let thresholdValue = $('#threshold-link-range').val();
+      let blockDeleteTargets = $('#block-targets')[0].checked;
+
+      for (let i = 0; i < mylinks.length; i++) {
+        if (mylinks[i].target.type == 'nice_node' || mylinks[i].source.type == 'nice_node' || mylinks[i].target.type == 'bad_node' || mylinks[i].source.type == 'bad_node') {
+          if (blockDeleteTargets) {
+
+            newLinks.push(mylinks[i]);
+            idxInLinks[mylinks[i].target.index] = true;
+            idxInLinks[mylinks[i].source.index] = true;
+          } else if (mylinks[i].weight * maxWeigth >= thresholdValue) {
+            newLinks.push(mylinks[i]);
+            idxInLinks[mylinks[i].target.index] = true;
+            idxInLinks[mylinks[i].source.index] = true;
+          }
+        } else if (mylinks[i].weight * maxWeigth >= thresholdValue) {
+          newLinks.push(mylinks[i]);
+          idxInLinks[mylinks[i].target.index] = true;
+          idxInLinks[mylinks[i].source.index] = true;
+        }
+      }
+
+      let newNodes = [];
+      for (let i = 0; i < mynodes.length; i++) {
+        if (idxInLinks[i]) {
+          newNodes.push(mynodes[i]);
+          $('#checkbox' + mynodes[i].index).prop('checked', true);
+        } else {
+          $('#checkbox' + mynodes[i].index).prop('checked', false);
+        }
+      }
+      clearSVG();
+      drawGraph(newNodes, newLinks);
+    }
+
+    function updateLinkThresholdText(val) {
+      document.getElementById('threshold-link-text').innerHTML = val;
+    }
+
+    function setNodeThreshold() {
+      var newNodes = [];
+      var newIdx = [];
+
+      let thresholdValue = $('#threshold-node-range').val();
+      let blockDeleteTargets = $('#block-targets')[0].checked;
+
+      for (let i = 0; i < mynodes.length; i++) {
+        if (mynodes[i].type == 'bad_node' || mynodes[i].type == 'nice_node') {
+          if (blockDeleteTargets) {
+            newNodes.push(mynodes[i]);
+            newIdx.push(mynodes[i].index);
+            $('#checkbox' + mynodes[i].index).prop('checked', true);
+          } else if (mynodes[i].degree >= $('#threshold-node-range').val() * maxDegree) {
+            newNodes.push(mynodes[i]);
+            newIdx.push(mynodes[i].index);
+            $('#checkbox' + mynodes[i].index).prop('checked', true);
+          } else {
+            $('#checkbox' + mynodes[i].index).prop('checked', false);
+          }
+        } else if (mynodes[i].degree >= $('#threshold-node-range').val() * maxDegree) {
+          newNodes.push(mynodes[i]);
+          newIdx.push(mynodes[i].index);
+          $('#checkbox' + mynodes[i].index).prop('checked', true);
+        } else {
+          $('#checkbox' + mynodes[i].index).prop('checked', false);
+        }
+      }
+      var newLinks = getCorrectLinks(newIdx);
+
+      clearSVG();
+      drawGraph(newNodes, newLinks);
+    }
+
+    function updateNodeThresholdText(val) {
+      document.getElementById('threshold-node-text').innerHTML = val;
+    }
+
+
+    function changeNamesVisibility(isHidden) {
+
+      if (isHidden) {
+        $('.node-name').each(
+          function() {
+            $(this).show();
+          });
+      } else {
+        $('.node-name').each(
+          function() {
+            $(this).hide();
+          });
+      }
+    }
+
+    function downloadLayout() {
+        var a = document.createElement("a");
+        var file = new Blob([JSON.stringify(mynodes)], {type: "text/json;charset=utf-8"});
+        a.href = URL.createObjectURL(file);
+        a.download = "node_params.json";
+        console.log(1);
+        a.click();
+
+    }
+
+  </script>
+
+  <style type="text/css">
+      watermark {
+        width: 100%;
+      }
+      watermark h3 {
+        width: 100%;
+        text-align: center;
+      }
+      html {
+        font-size: 10px;
+      }
+
+      circle {
+        fill: #ccc;
+        stroke: #333;
+        stroke-width: 1.5px;
+      }
+
+      .circle.source_node {
+        fill: #f3f310;
+      }
+
+      .circle.nice_node {
+        fill: green;
+      }
+
+      .circle.bad_node {
+        fill: red;
+      }
+
+      .link {
+        fill: none;
+        stroke: #666;
+        stroke-opacity: 0.7;
+      }
+
+      #nice_target {
+        fill: green;
+      }
+
+      .link.nice_target {
+        stroke: green;
+      }
+
+      #source {
+        fill: yellow;
+      }
+
+      .link.source {
+        stroke: #f3f310;
+      }
+
+      .link.positive {
+        stroke: green;
+      }
+
+      .link.negative {
+        stroke: red;
+      }
+
+      #source {
+        fill: orange;
+      }
+
+      .link.source1 {
+        stroke: orange;
+      }
+
+      #bad_target {
+        fill: red;
+      }
+
+      .link.bad_target {
+        stroke: red;
+      }
+      text {
+        font: 12px sans-serif;
+        pointer-events: none;
+      }
+
+      main li {
+        display: inline;
+      }
+      .graphlist {
+        list-style-type: none;
+
+      }
+      .graphloader {
+        margin-top: 5%;
+        margin-bottom: 5%;
+      }
+      .graphloader input {
+        margin: auto;
+      }
+
+      h1 {
+        text-align: center;
+      }
+
+      .bottom-checkbox {
+        margin-right: 5%;
+        display: inline;
+      }
+
+      .checkbox-class {
+        margin-right: 3px;
+      }
+
+      .node-edit {
+        position: relative;
+        font-size: 12px;
+        border: none;
+        background-color: rgba(1,1,1,0);
+      }
+
+      .node-edit:focus {
+        background-color: #ddd;
+      }
+
+      #option {
+        margin-left: 5px;
+      }
+
+      #freakingGraph {
+        border: solid 2px black;
+        /*position: relative;*/
+      }
+
+      .container {
+        margin: 0!important;
+        padding-right: 0!important;
+        max-width: 1200px!important;
+      }
+      .col-8 {
+        padding: 0px 4px 0px 2px!important;
+      }
+      .col-4 {
+        padding-right: 0px!important;
+      }
+      @media (max-width: 576px) {
+        form label {
+          font-size: 10px;
+        }
+      }
+
+
+      @media (max-width: 768px) {
+        form label {
+          font-size: 0.8rem;
+        }
+      }
+
+
+      @media (max-width: 992px) {
+        form label {
+          font-size: 1rem;
+        }
+      }
+
+      @media (max-width: 1200px) {
+        form label {
+          font-size: 1rem;
+        }
+      }
+
+      @media (min-width: 1201px) {
+        form label {
+          font-size: 1.4rem;
+        }
+      }
+
+  </style>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+</head>
+<body>
+
+
+
+  <main>
+
+    <div class="container">
+
+        <div class="row">
+          <div class="watermark" style="z-index: 1010; background-color: #FFF; width: 100%">
+            <h3>Retentioneering</h3>
+          </div>
+          <div class="col-8">
+
+            <div id="freakingGraph" style="z-index: 1000">
+              <!-- graph will be appended here -->
+            </div>
+          </div>
+          <div class="col-4" style="z-index: 1010; background-color: #FFF">
+            <form>
+              <div id="check-boxes">
+
+              </div>
+              <br>
+              <input name="submit" value="Update nodes" style="width: 80%;" type="button" onclick="changeNodes()">
+
+            </form>
+
+            <br>
+            <br>
+            <div style="z-index: 1010; background-color: #FFF">
+              <h6>Nodes Threshold</h6>
+              <input id="threshold-node-range" name="threshold-node" type="range" min="0" max="1" step="0.01" value="0.05"
+              oninput="updateNodeThresholdText(this.value)" onchange="updateNodeThresholdText(this.value)">
+              <label id="threshold-node-text">0.05</label>
+              <input type="button" value="Set threshold" onclick="setNodeThreshold()">
+            </div>
+            <br>
+            <div>
+              <h6>Links Threshold</h6>
+              <input id="threshold-link-range" name="threshold" type="range" min="0" max="1" step="0.01" value=0.2
+              oninput="updateLinkThresholdText(this.value*1.0)" onchange="updateLinkThresholdText(this.value*1.0)">
+              <label id="threshold-link-text">0.2</label>
+              <input type="button" value="Set threshold" onclick="setLinkThreshold()">
+            </div>
+          </div>
+
+
+
+
+          <div class="col-12" style="z-index: 1010; background-color: #FFF">
+
+            <div class="weight-checkbox bottom-checkbox">
+              <input type="checkbox" class="checkbox checkbox-class" checked value="weighted" id="show-weights"><label> Show weights </label>
+            </div>
+
+            <div class="percent-checkbox bottom-checkbox">
+              <input type="checkbox" class="checkbox checkbox-class" checked id="show-percents"><label> Percents </label>
+            </div>
+
+            <div class="bottom-checkbox">
+              <input type="checkbox" class="checkbox checkbox-class" checked id="show-names" onchange="changeNamesVisibility(this.checked)"><label> Show nodes names</label>
+            </div>
+
+            <div class="bottom-checkbox">
+              <input type="checkbox" class="checkbox checkbox-class" id="block-targets" onchange="setLinkThreshold ()"><label> Show all edges for targets </label>
+            </div>
+            <div id="option">
+              <input name="downloadButton"
+              type="button"
+              value="download"
+              onclick="downloadLayout()" />
+            </div>
+          </div>
+      </div>
+
+
+
+
+  </main>
+
+  <script src="https://api.retentioneering.com/files/d3.v4.min.js"></script>
+
+  <script type="text/javascript">
+
+    updateLinkThresholdText(0.2*1.0);
+    initialize([{"index": 0, "name": "", "x": 339.8236991530906, "y": 273.80042489549743, "type": "suit_node", "degree": 7.7018544935805995}, {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, {"index": 2, "name": "fach-und-lehrkrafte-fortbildungen-ufuq.de", "x": 385.8149735203296, "y": 227.58036393816715, "type": "suit_node", "degree": 4.192582025677604}, {"index": 3, "name": "center-for-performing-arts", "x": 239.64424360824592, "y": 233.88813684123633, "type": "suit_node", "degree": 4.235378031383737}, {"index": 4, "name": "klassengedanken", "x": 213.8782246437843, "y": 277.2370693919888, "type": "suit_node", "degree": 4.4065620542082735}, {"index": 5, "name": "ueberUns", "x": 172.03460045054078, "y": 268.506968231384, "type": "suit_node", "degree": 9.5848787446505}, {"index": 6, "name": "parlamentssimulationen-europaparlament", "x": 285.62454067628295, "y": 101.89698046743584, "type": "suit_node", "degree": 4.14978601997147}, {"index": 7, "name": "mediathek-gegen-rassismus-und-diskriminierung", "x": 267.8990929962498, "y": 169.5271859484912, "type": "suit_node", "degree": 4.192582025677604}, {"index": 8, "name": "blinc-workshops", "x": 310.953917821962, "y": 58.677103811113284, "type": "suit_node", "degree": 4.2139800285306706}, {"index": 9, "name": "konterbunt-einschreiten-fuer-demokratie", "x": 335.0584558218254, "y": 265.7364200815045, "type": "suit_node", "degree": 4.2781740370898715}, {"index": 10, "name": "in-gedenken-an-die-opfer-von-hanau", "x": 338.7520182532878, "y": 268.4588275767626, "type": "suit_node", "degree": 4.021398002853067}, {"index": 11, "name": "arbeiterkind.de", "x": 344.2990790836702, "y": 268.9384136660309, "type": "suit_node", "degree": 4.192582025677604}, {"index": 12, "name": "fluchterfahren", "x": 222.0903947654541, "y": 250.0217809309571, "type": "suit_node", "degree": 4.064194008559201}, {"index": 13, "name": "germandream-wertedialog", "x": 93.57211258338572, "y": 126.16976430264593, "type": "suit_node", "degree": 4.192582025677604}, {"index": 14, "name": "meet-a-jew", "x": 256.3356466156433, "y": 137.9106685344463, "type": "suit_node", "degree": 4.4065620542082735}, {"index": 15, "name": "rueckblick-vielfalt-netzwerkt-digital-4", "x": 311.65899781436895, "y": 55.63103508419997, "type": "suit_node", "degree": 5.069900142653353}, {"index": 16, "name": "Vielfalt%20der%20Religionen", "x": 449.98085223730874, "y": 164.94049032896476, "type": "suit_node", "degree": 5.840228245363766}, {"index": 17, "name": "netzwerktagung", "x": 336.1389568509719, "y": 270.29959591946977, "type": "suit_node", "degree": 5.0271041369472185}, {"index": 18, "name": "die-freiheit-die-ich-meine", "x": 335.7635391238749, "y": 263.7472182678913, "type": "suit_node", "degree": 4.470756062767475}, {"index": 19, "name": "rollisport-bewegt-schule", "x": 112.50671958947463, "y": 232.72465156330338, "type": "suit_node", "degree": 4.171184022824536}, {"index": 20, "name": "rueckblick-vielfalt-netzwerkt-digital-8", "x": 334.6563425203499, "y": 222.38233189459737, "type": "suit_node", "degree": 4.2139800285306706}, {"index": 21, "name": "fuma-lernkarten", "x": 142.3099695894606, "y": 76.76490329538754, "type": "suit_node", "degree": 4.171184022824536}, {"index": 22, "name": "genderdings.de", "x": 329.8275089012782, "y": 180.9730986453951, "type": "suit_node", "degree": 4.085592011412269}, {"index": 23, "name": "klischeefrei", "x": 314.1699342857664, "y": 55.86224650575173, "type": "suit_node", "degree": 4.042796005706134}, {"index": 24, "name": "schlau-nrw", "x": 343.45439456757765, "y": 275.1132705414874, "type": "suit_node", "degree": 4.2139800285306706}, {"index": 25, "name": "bisexualitaet-und-schule", "x": 325.92692445069486, "y": 237.05829622955784, "type": "suit_node", "degree": 4.085592011412269}, {"index": 26, "name": "colorful-classroom", "x": 343.73091056127663, "y": 271.3381662397611, "type": "suit_node", "degree": 4.36376604850214}, {"index": 27, "name": "interreligious-peers", "x": 318.59499540927425, "y": 160.55324250142297, "type": "suit_node", "degree": 4.064194008559201}, {"index": 28, "name": "fuhrungen-und-projekte-der-gedenkstatte-roter-ochse-halle-saale", "x": 337.3107533747921, "y": 274.2635975259276, "type": "suit_node", "degree": 4.299572039942938}, {"index": 29, "name": "map-the-gap", "x": 256.5126296181418, "y": 175.83561459353066, "type": "suit_node", "degree": 4.085592011412269}, {"index": 30, "name": "mehr-als-vergangenheit", "x": 327.61826058154645, "y": 162.14149654956654, "type": "suit_node", "degree": 4.064194008559201}, {"index": 31, "name": "rueckblick-vielfalt-netzwerkt-digital-antirassismus-und-themenubergreifend-3", "x": 219.89336535242782, "y": 161.01352784200708, "type": "suit_node", "degree": 4.128388017118402}, {"index": 32, "name": "schlau-niedersachsen", "x": 227.04534399043106, "y": 115.53454500478517, "type": "suit_node", "degree": 4.128388017118402}, {"index": 33, "name": "schnittstelle-geschlecht", "x": 136.58501551879806, "y": 96.53204071595154, "type": "suit_node", "degree": 4.106990014265335}, {"index": 34, "name": "mitmischen-madchen-zeigen-engagement", "x": 103.68988839977348, "y": 228.26180203199547, "type": "suit_node", "degree": 4.3423680456490725}, {"index": 35, "name": "game-augen-auf", "x": 229.30282706472804, "y": 170.53309623054912, "type": "suit_node", "degree": 4.085592011412269}, {"index": 36, "name": "klipp-klar", "x": 232.90864805845396, "y": 283.0, "type": "suit_node", "degree": 4.492154065620542}, {"index": 37, "name": "haydee-digitale-nachhilfe", "x": 211.43711928508603, "y": 84.46489046723823, "type": "suit_node", "degree": 4.2139800285306706}, {"index": 38, "name": "auszeichnung-weltethos-schule", "x": 267.92184105759776, "y": 107.88202530086619, "type": "suit_node", "degree": 4.171184022824536}, {"index": 39, "name": "rueckblick-vielfalt-netzwerkt-digital-antirassismus-und-themenubergreifend-4", "x": 393.7217246353988, "y": 81.59741551457614, "type": "suit_node", "degree": 4.085592011412269}, {"index": 40, "name": "werde-volunteer-special-olympics-world-games-berlin-2023", "x": 337.65194653242656, "y": 265.8932841086031, "type": "suit_node", "degree": 6.5249643366619114}, {"index": 41, "name": "netzwerktagung-so-war-es", "x": 163.3723413045767, "y": 68.21853225256307, "type": "suit_node", "degree": 5.005706134094151}, {"index": 42, "name": "Geschlecht%20und%20Sexualit%C3%A4t", "x": 451.45470059479663, "y": 160.54495869949284, "type": "suit_node", "degree": 6.653352353780313}, {"index": 43, "name": "nest?fbclid=PAAab_sDUDrXu36B3xQg2Ewi2fdqYSclLxOOABFMpjxrWJes9BiT2OZLbLCFU", "x": 339.69338956390544, "y": 268.8898624268834, "type": "suit_node", "degree": 4.021398002853067}, {"index": 44, "name": "kulturtauchen", "x": 255.7516271089836, "y": 105.0642631087262, "type": "suit_node", "degree": 4.14978601997147}, {"index": 45, "name": "vielfalt-mediathek", "x": 225.78534069803732, "y": 161.8374183426682, "type": "suit_node", "degree": 4.085592011412269}, {"index": 46, "name": "lehrkraefte-diversitat-und-interkulturalitat-umgang-mit-vielfalt-in-der-schule", "x": 278.84577591258676, "y": 171.00676580300572, "type": "suit_node", "degree": 4.470756062767475}, {"index": 47, "name": "touchdown-21", "x": 208.82535354273773, "y": 104.04847289428048, "type": "suit_node", "degree": 4.3423680456490725}, {"index": 48, "name": "andersartig-gedenken-on-stage", "x": 96.23228074361379, "y": 179.37232171713484, "type": "suit_node", "degree": 4.021398002853067}, {"index": 49, "name": "vinedig", "x": 328.88298610230345, "y": 172.89617156931428, "type": "suit_node", "degree": 9.135520684736091}, {"index": 50, "name": "peer-academy", "x": 262.7742078480635, "y": 57.1089067158572, "type": "suit_node", "degree": 4.042796005706134}, {"index": 51, "name": "politik-in-berlin", "x": 342.66011662845045, "y": 270.33398967910705, "type": "suit_node", "degree": 4.064194008559201}, {"index": 52, "name": "salvia-der-barrierefreie-bildungsgarten", "x": 225.93899970331384, "y": 161.77291057426658, "type": "suit_node", "degree": 4.085592011412269}, {"index": 53, "name": "lernort-7xjung", "x": 317.4427057306734, "y": 54.81201142660645, "type": "suit_node", "degree": 4.2139800285306706}, {"index": 54, "name": "click-digitale-trainings", "x": 90.93746234891684, "y": 124.98155890220757, "type": "suit_node", "degree": 4.042796005706134}, {"index": 55, "name": "nest", "x": 302.143568583002, "y": 182.85931997199347, "type": "suit_node", "degree": 4.106990014265335}, {"index": 56, "name": "connecting-the-dots", "x": 297.74981371840784, "y": 156.87118280915467, "type": "suit_node", "degree": 4.064194008559201}, {"index": 57, "name": "start-vielfalt-netzwerk-digital", "x": 177.94429752000815, "y": 263.9430772140465, "type": "suit_node", "degree": 4.021398002853067}, {"index": 58, "name": "mut-zu-taten-vielfaltsbotschafter-innen-in-aktion", "x": 253.3958294875072, "y": 55.838603068512015, "type": "suit_node", "degree": 4.106990014265335}, {"index": 59, "name": "arrivalnews-einfach-besser-verstehen", "x": 403.6454550687128, "y": 213.19412298892038, "type": "suit_node", "degree": 4.085592011412269}, {"index": 60, "name": "in.zirque-kuenstlerisches-bewegungslernen-im-inklusiven-kontext", "x": 234.5573849262556, "y": 210.5058771075491, "type": "suit_node", "degree": 4.085592011412269}, {"index": 61, "name": "kleine-pause-podcast", "x": 90.1046012995856, "y": 213.01016560883562, "type": "suit_node", "degree": 4.106990014265335}, {"index": 62, "name": "projektAnbieten", "x": 313.95690035242046, "y": 58.49392779058975, "type": "suit_node", "degree": 6.803138373751784}, {"index": 63, "name": "the-unstoppables", "x": 281.79871062364543, "y": 175.84598940756098, "type": "suit_node", "degree": 4.256776034236805}, {"index": 64, "name": "vinedig?fbclid=IwAR0LU792h7K7ZJH9qqbtlld5D2iYBZ_VGjohgYVzN3zHAnGD3B30zNXoWVI", "x": 339.7950418604066, "y": 270.3669917862695, "type": "suit_node", "degree": 4.021398002853067}, {"index": 65, "name": "vielfalt-netzwerkt-im-livestream", "x": 334.8190347217041, "y": 266.7332471215103, "type": "suit_node", "degree": 4.57774607703281}, {"index": 66, "name": "bbz-lebensart", "x": 281.6497112115438, "y": 158.37291512446274, "type": "suit_node", "degree": 4.128388017118402}, {"index": 67, "name": "liebesleben", "x": 83.55802736997285, "y": 203.24835504202375, "type": "suit_node", "degree": 4.14978601997147}, {"index": 68, "name": "ndc", "x": 197.5518984535035, "y": 121.8099485032785, "type": "suit_node", "degree": 4.042796005706134}, {"index": 69, "name": "kontakt", "x": 116.95316500121871, "y": 90.9669223854128, "type": "suit_node", "degree": 7.423680456490727}, {"index": 70, "name": "Altersvielfalt", "x": 458.0, "y": 159.86141857457432, "type": "suit_node", "degree": 5.519258202567761}, {"index": 71, "name": "we-simply-are", "x": 287.0567688483068, "y": 135.55338626044545, "type": "suit_node", "degree": 4.171184022824536}, {"index": 72, "name": "inklusion-buehnenreif", "x": 368.57587157578325, "y": 175.76985805729566, "type": "suit_node", "degree": 4.042796005706134}, {"index": 73, "name": "verbrannte-orte", "x": 80.30341258594804, "y": 191.1969410460312, "type": "suit_node", "degree": 4.171184022824536}, {"index": 74, "name": "aktuelles", "x": 396.71792577764677, "y": 79.66967006659138, "type": "suit_node", "degree": 6.824536376604851}, {"index": 75, "name": "soorum-aufklarungsprojekt-zur-sexuellen-und-geschlechtlichen-vielfalt-fur-schulklassen-und-jugendgruppen", "x": 341.30535328842905, "y": 274.8235627794553, "type": "suit_node", "degree": 4.171184022824536}, {"index": 76, "name": "auf-klo", "x": 207.3352721950242, "y": 152.3502231986041, "type": "suit_node", "degree": 4.064194008559201}, {"index": 77, "name": "schule-gegen-sexismus-projekttag-7-9-klasse", "x": 335.793393714585, "y": 268.99122501787474, "type": "suit_node", "degree": 5.562054208273894}, {"index": 78, "name": "klipp-klar?utm_source=sendinblue&utm_campaign=Literatur&utm_medium=email", "x": 275.1342298572437, "y": 165.07477826853813, "type": "suit_node", "degree": 4.085592011412269}, {"index": 79, "name": "Gender,%20K%C3%B6rperbild%20und%20Sexualit%C3%A4t", "x": 311.4249498930926, "y": 202.26962798840407, "type": "suit_node", "degree": 4.4065620542082735}, {"index": 80, "name": "splint-web-app-zur-individuellen-foerderplanung", "x": 257.8062883758156, "y": 196.02731654647522, "type": "suit_node", "degree": 4.14978601997147}, {"index": 81, "name": "eduki-standwithukraine", "x": 222.03069811669343, "y": 250.14037451256374, "type": "suit_node", "degree": 4.064194008559201}, {"index": 82, "name": "identitat-vorurteile-muslimisch-in-deutschland-na-klar", "x": 382.387362090386, "y": 108.6784637578611, "type": "suit_node", "degree": 4.064194008559201}, {"index": 83, "name": "jugendsprecher-kurs-tandem", "x": 218.76152432272465, "y": 226.02649705209265, "type": "suit_node", "degree": 4.256776034236805}, {"index": 84, "name": "rueckblick-vielfalt-netzwerkt-digital-interreligioser-dialog-und-soziale-herkunft-2", "x": 354.2647412151509, "y": 67.00802651957167, "type": "suit_node", "degree": 4.085592011412269}, {"index": 85, "name": "mys-toolbox", "x": 336.46482733234603, "y": 266.8598590487816, "type": "suit_node", "degree": 4.663338088445078}, {"index": 86, "name": "wheelmap-macht-schule", "x": 340.4907087433882, "y": 265.78176186454834, "type": "suit_node", "degree": 4.192582025677604}, {"index": 87, "name": "gender-benchmarking-tool", "x": 242.9948664745219, "y": 178.40968074254582, "type": "suit_node", "degree": 4.128388017118402}, {"index": 88, "name": "trans-ja-und", "x": 307.99566609269436, "y": 154.20415086227783, "type": "suit_node", "degree": 4.085592011412269}, {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, {"index": 90, "name": "insta-live-talk-mit-natalie-dedreux", "x": 313.4005021172395, "y": 59.829463619965495, "type": "suit_node", "degree": 4.663338088445078}, {"index": 91, "name": "Flucht%20und%20Migration", "x": 447.18347451634327, "y": 206.60566600130454, "type": "suit_node", "degree": 6.011412268188303}, {"index": 92, "name": "index", "x": 449.68961023712177, "y": 165.833936187448, "type": "suit_node", "degree": 4.021398002853067}, {"index": 93, "name": "make-superheroes-great-again", "x": 175.52595928827714, "y": 265.76134786385, "type": "suit_node", "degree": 4.042796005706134}, {"index": 94, "name": "rueckblick-vielfalt-netzwerkt-digital-5", "x": 275.28458755112854, "y": 97.72954354449712, "type": "suit_node", "degree": 4.192582025677604}, {"index": 95, "name": "klar-und-einfach", "x": 337.4163292798611, "y": 264.0487026968775, "type": "suit_node", "degree": 4.4065620542082735}, {"index": 96, "name": "vielfalt-in-schulen", "x": 327.66266964863354, "y": 162.41602453086006, "type": "suit_node", "degree": 4.128388017118402}, {"index": 97, "name": "Soziale%20Herkunft", "x": 456.09368167179724, "y": 164.41809742076634, "type": "suit_node", "degree": 6.118402282453638}, {"index": 98, "name": "relithek.de-ein-multimediaportal-zur-inter-religiosen-verstandigung-und-bildung", "x": 252.95846157367134, "y": 188.06740225483173, "type": "suit_node", "degree": 4.106990014265335}, {"index": 99, "name": "familienbande-ich-weiss-da-was-was-du-nicht-siehst", "x": 331.8725495857626, "y": 268.8192790838881, "type": "suit_node", "degree": 4.042796005706134}, {"index": 100, "name": "liebesleben-queere-bildung-fur-jung-und-alt-respekt-beginnt-im-kopf", "x": 439.66256180682507, "y": 161.93440940005823, "type": "suit_node", "degree": 4.235378031383737}, {"index": 101, "name": "girls-hacker-school", "x": 158.23885775661822, "y": 243.11934953339744, "type": "suit_node", "degree": 4.042796005706134}, {"index": 102, "name": "team-meeting-im-tuechtig-berlin", "x": 324.6115492889676, "y": 178.51285419882174, "type": "suit_node", "degree": 4.106990014265335}, {"index": 103, "name": "Leben%20mit%20Behinderung", "x": 97.10007778286307, "y": 180.18385605721247, "type": "suit_node", "degree": 7.8302425106990015}, {"index": 104, "name": "rueckblick-vielfalt-netzwerkt-digital-migration-und-behinderung", "x": 258.81821671516565, "y": 67.61987383891913, "type": "suit_node", "degree": 4.042796005706134}, {"index": 105, "name": "unterrichtsmaterial-des-tamam-projekts", "x": 97.90152975647446, "y": 220.67336845745848, "type": "suit_node", "degree": 4.4065620542082735}, {"index": 106, "name": "romaktiv-junge-rom-nja-und-sinti-zze-engagiert-in-berlin", "x": 455.69199729398434, "y": 165.35848603054154, "type": "suit_node", "degree": 4.021398002853067}, {"index": 107, "name": "netzwerktreffen", "x": 315.79796144068524, "y": 55.64018736735718, "type": "suit_node", "degree": 4.641940085592012}, {"index": 108, "name": "everynamecounts", "x": 94.10478985410992, "y": 125.45476151096449, "type": "suit_node", "degree": 4.064194008559201}, {"index": 109, "name": "prevent-beratungsstelle-berlin", "x": 235.60218129804082, "y": 211.03113635336447, "type": "suit_node", "degree": 4.085592011412269}, {"index": 110, "name": "zwischentoene", "x": 87.4170036636833, "y": 124.27028841803431, "type": "suit_node", "degree": 4.021398002853067}, {"index": 111, "name": "sichtweisen-kurzgeschichten-cbm", "x": 339.79712202057806, "y": 266.7243668286607, "type": "suit_node", "degree": 4.620542082738944}, {"index": 112, "name": "kidscourage-fur-kinderrechte", "x": 311.33937422459496, "y": 58.75700495264559, "type": "suit_node", "degree": 4.042796005706134}, {"index": 113, "name": "dialogmuseum-frankfurt-am-main", "x": 422.76098479419613, "y": 99.13351018360957, "type": "suit_node", "degree": 4.064194008559201}, {"index": 114, "name": "miphgasch-begegnung-e.v", "x": 223.5805541446633, "y": 219.28427910509893, "type": "suit_node", "degree": 4.106990014265335}, {"index": 115, "name": "konferenz", "x": 315.45532271631566, "y": 58.484300947358335, "type": "suit_node", "degree": 4.877318116975749}, {"index": 116, "name": "spuren-auf-papier", "x": 341.44818098620266, "y": 266.2249946524048, "type": "suit_node", "degree": 4.085592011412269}, {"index": 117, "name": "fingeralphabet-uebersetzer-mit-scratch", "x": 421.3944305002545, "y": 100.25726077442408, "type": "suit_node", "degree": 4.171184022824536}, {"index": 118, "name": "podcast-ojtbd", "x": 264.3333983447734, "y": 164.82780907239254, "type": "suit_node", "degree": 4.106990014265335}, {"index": 119, "name": "colored-glasses", "x": 199.44006397812075, "y": 84.31053609884046, "type": "suit_node", "degree": 4.064194008559201}, {"index": 120, "name": "zweitzeugen", "x": 213.64047838773598, "y": 62.70756041647123, "type": "suit_node", "degree": 4.042796005706134}, {"index": 121, "name": "forderung-fur-schuler-innen", "x": 259.6371577478899, "y": 195.21366349904005, "type": "suit_node", "degree": 4.064194008559201}, {"index": 122, "name": "schlau-rlp", "x": 256.7512036679709, "y": 155.27399746661632, "type": "suit_node", "degree": 4.128388017118402}, {"index": 123, "name": "ueberUns?fbclid=PAAaY_I5XXEE8l4KhUt-DWTJW6pA-KheqcBEp6NagH8FQDxwgcUORxv9wsFfc", "x": 174.86703332893921, "y": 267.16964435942293, "type": "suit_node", "degree": 4.021398002853067}, {"index": 124, "name": "venedigneu", "x": 315.3245117021243, "y": 58.85790248072237, "type": "suit_node", "degree": 4.021398002853067}, {"index": 125, "name": "sibels-s-journey", "x": 286.40576690129, "y": 183.39535332373543, "type": "suit_node", "degree": 4.106990014265335}, {"index": 126, "name": "cashless-muenchen", "x": 91.86624736232028, "y": 124.35216495009773, "type": "suit_node", "degree": 4.128388017118402}, {"index": 127, "name": "irmgard-app-fuer-alphabetisierung", "x": 334.3325484245964, "y": 270.2406144446104, "type": "suit_node", "degree": 4.2781740370898715}, {"index": 128, "name": "die-pastinaken", "x": 203.15485827659657, "y": 138.61406249873085, "type": "suit_node", "degree": 4.106990014265335}, {"index": 129, "name": "meet2respect", "x": 212.70970462440675, "y": 197.7525886699362, "type": "suit_node", "degree": 4.085592011412269}, {"index": 130, "name": "bundesnetzwerk-schule-der-vielfalt", "x": 398.06247294974736, "y": 216.3213454722171, "type": "suit_node", "degree": 4.128388017118402}, {"index": 131, "name": "say-my-name", "x": 337.17162080290865, "y": 265.1608631959399, "type": "suit_node", "degree": 4.256776034236805}, {"index": 132, "name": "workshop-fur-fachkrafte-sozial-engagierte-eltern-und-interessierte", "x": 330.7223890787374, "y": 109.39815443126489, "type": "suit_node", "degree": 4.042796005706134}, {"index": 133, "name": "entwickle-deine-yoga-app", "x": 255.8729056753636, "y": 137.04565825789348, "type": "suit_node", "degree": 4.021398002853067}, {"index": 134, "name": "projektSuche", "x": 75.0, "y": 176.24587703235647, "type": "suit_node", "degree": 5.947218259629102}, {"index": 135, "name": "merkListe", "x": 110.10837785440867, "y": 232.39633075668164, "type": "suit_node", "degree": 5.0912981455064195}, {"index": 136, "name": "kompetent-durch-schule-und-ausbildung-trainings-fuer-daz-lerner-innen", "x": 337.49137000121624, "y": 266.7189876575154, "type": "suit_node", "degree": 4.085592011412269}, {"index": 137, "name": "Antirassismus", "x": 450.18416557120963, "y": 207.05741839175496, "type": "suit_node", "degree": 6.738944365192582}, {"index": 138, "name": "einmal-brainwash-und-zuruck-verschworungsmythen-erleben", "x": 266.29622070943276, "y": 173.70823488229007, "type": "suit_node", "degree": 4.106990014265335}, {"index": 139, "name": "touchdown-21?fbclid=PAAaZkWBwuVkDkC0wvO-4hyo2rKoFh6IMSuludPePH0Qt_I9Q3lRZ-3D3iB0o", "x": 219.84768932508177, "y": 173.51507656733327, "type": "suit_node", "degree": 4.042796005706134}, {"index": 140, "name": "ufuq.de-wie-wollen-wir-leben", "x": 343.91251676036654, "y": 273.6339288168442, "type": "suit_node", "degree": 4.2139800285306706}, {"index": 141, "name": "empfehlungen", "x": 212.89130721023545, "y": 61.787603919857574, "type": "suit_node", "degree": 6.61055634807418}, {"index": 142, "name": "knowbody", "x": 275.3127242566235, "y": 165.04421942892787, "type": "suit_node", "degree": 4.320970042796006}, {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, {"index": 144, "name": "stories-for-tomorrow-fur-lehrende-multiplikator-innen-fokus-antisemitismuskritische-bildung", "x": 335.77612561069225, "y": 272.2482456746961, "type": "suit_node", "degree": 4.171184022824536}, {"index": 145, "name": "Venedigneu", "x": 306.02963549946526, "y": 164.126744321946, "type": "suit_node", "degree": 4.128388017118402}, {"index": 146, "name": "22-prozent-bonus-auf-jede-spende-fur-wirfurvielfalt", "x": 173.87302667901133, "y": 267.152034264872, "type": "suit_node", "degree": 4.042796005706134}, {"index": 147, "name": "mediathek-gegen-rassismus-und-diskriminierung?fbclid=PAAaZros0YJuOr0pD2_vb9oizM142AAXKIoK2FHHDtxv_NqPz-MuCKffjE2J0", "x": 340.39355441774813, "y": 269.7117809320901, "type": "suit_node", "degree": 4.021398002853067}, {"index": 148, "name": "inklu-game", "x": 212.5634722850383, "y": 197.8473017509635, "type": "suit_node", "degree": 4.256776034236805}, {"index": 149, "name": "Themen%20%C3%BCbergreifend", "x": 455.6718632761162, "y": 160.75769635162703, "type": "suit_node", "degree": 5.241084165477888}, {"index": 150, "name": "sponsorships-for-students", "x": 295.96278392224735, "y": 112.74113915955687, "type": "suit_node", "degree": 4.14978601997147}, {"index": 151, "name": "diversity-munchen-e.v", "x": 452.3585442813244, "y": 158.9804280704955, "type": "suit_node", "degree": 4.171184022824536}, {"index": 152, "name": "vielfalt-netzwerkt-digital-antirassismus-und-gender", "x": 331.5449882417476, "y": 172.60989439544335, "type": "suit_node", "degree": 4.2139800285306706}, {"index": 153, "name": "Download", "x": 210.4850833131593, "y": 197.01241710567038, "type": "suit_node", "degree": 4.2139800285306706}, {"index": 154, "name": "insta-live-mit-knowbody", "x": 285.11370903125885, "y": 119.91206315842506, "type": "suit_node", "degree": 4.064194008559201}, {"index": 155, "name": "serious-game-hidden-codes", "x": 204.43301032726686, "y": 151.17778123324388, "type": "suit_node", "degree": 4.064194008559201}, {"index": 156, "name": "hackathon-gegen-antisemitismus-einladung-zum-insta-live-talk", "x": 173.141934294703, "y": 266.6461253116696, "type": "suit_node", "degree": 4.021398002853067}, {"index": 157, "name": "wheelmap-macht-schule-schulmaterial-zum-thema-barrierefreiheit", "x": 314.06808436660833, "y": 54.81425269198559, "type": "suit_node", "degree": 4.021398002853067}, {"index": 158, "name": "rueckblick-vielfalt-netzwerkt-digital-7", "x": 443.6267023225844, "y": 119.39348019173852, "type": "suit_node", "degree": 4.727532097004279}, {"index": 159, "name": "youth-leadership-datenbank", "x": 338.4681895904556, "y": 270.55368688409663, "type": "suit_node", "degree": 4.021398002853067}, {"index": 160, "name": "ultraviolett-stories", "x": 424.0613697392999, "y": 120.11506549020184, "type": "suit_node", "degree": 4.085592011412269}, {"index": 161, "name": "widerstand-gegen-rassismus", "x": 136.76781775681923, "y": 96.66188686396347, "type": "suit_node", "degree": 4.085592011412269}, {"index": 162, "name": "pravention-von-muslimfeindlichkeit", "x": 338.2233396355765, "y": 267.43942093525106, "type": "suit_node", "degree": 4.042796005706134}, {"index": 163, "name": "joint-generations", "x": 91.34508704730699, "y": 125.56688203202641, "type": "suit_node", "degree": 4.171184022824536}, {"index": 164, "name": "bildmachen", "x": 384.5347245980463, "y": 242.77046219143662, "type": "suit_node", "degree": 4.064194008559201}, {"index": 165, "name": "quertanz", "x": 336.46798233605637, "y": 267.67921948844673, "type": "suit_node", "degree": 4.492154065620542}, {"index": 166, "name": "geschichte-inklusiv", "x": 313.5516242565751, "y": 57.555674898765744, "type": "suit_node", "degree": 4.320970042796006}, {"index": 167, "name": "antianti", "x": 259.7306518653724, "y": 50.0, "type": "suit_node", "degree": 4.299572039942938}, {"index": 168, "name": "home", "x": 219.1818931212656, "y": 150.78477114816548, "type": "suit_node", "degree": 4.299572039942938}, {"index": 169, "name": "ohrenkuss", "x": 221.40416398738088, "y": 173.35383745197709, "type": "suit_node", "degree": 4.299572039942938}, {"index": 170, "name": "peer4queer", "x": 336.01823679072567, "y": 217.00387538789943, "type": "suit_node", "degree": 4.064194008559201}, {"index": 171, "name": "direkiju-dialog-der-religionen-fuer-kinder-und-jugendliche", "x": 338.41641869869966, "y": 269.1952663952518, "type": "suit_node", "degree": 4.042796005706134}, {"index": 172, "name": "stattwerkstatt", "x": 280.63795550437237, "y": 187.75266458310833, "type": "suit_node", "degree": 4.128388017118402}, {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, {"index": 174, "name": "eis-eine-inklusive-sprachlern-app", "x": 342.4674404676815, "y": 268.7593186662617, "type": "suit_node", "degree": 4.427960057061341}, {"index": 175, "name": "worldlab", "x": 433.361395249556, "y": 106.19699440861712, "type": "suit_node", "degree": 4.36376604850214}, {"index": 176, "name": "wen-siehst-du", "x": 203.4644745200379, "y": 192.48455947627858, "type": "suit_node", "degree": 4.235378031383737}, {"index": 177, "name": "alles-fur-alle", "x": 295.06115317771787, "y": 108.72606821259396, "type": "suit_node", "degree": 4.106990014265335}, {"index": 178, "name": "bildungsmaterial-antirassismusarbeit", "x": 338.47121406014406, "y": 266.48341736431814, "type": "suit_node", "degree": 4.36376604850214}], {}, [{"source": {"index": 0, "name": "", "x": 339.8236991530906, "y": 273.80042489549743, "type": "suit_node", "degree": 7.7018544935805995}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.31851851851851853, "weight_text": 0.31851851851851853, "type": "suit"}, {"source": {"index": 146, "name": "22-prozent-bonus-auf-jede-spende-fur-wirfurvielfalt", "x": 173.87302667901133, "y": 267.152034264872, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 5, "name": "ueberUns", "x": 172.03460045054078, "y": 268.506968231384, "type": "suit_node", "degree": 9.5848787446505}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 70, "name": "Altersvielfalt", "x": 458.0, "y": 159.86141857457432, "type": "suit_node", "degree": 5.519258202567761}, "target": {"index": 149, "name": "Themen%20%C3%BCbergreifend", "x": 455.6718632761162, "y": 160.75769635162703, "type": "suit_node", "degree": 5.241084165477888}, "weight": 0.23076923076923078, "weight_text": 0.23076923076923078, "type": "suit"}, {"source": {"index": 153, "name": "Download", "x": 210.4850833131593, "y": 197.01241710567038, "type": "suit_node", "degree": 4.2139800285306706}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.2857142857142857, "weight_text": 0.2857142857142857, "type": "suit"}, {"source": {"index": 153, "name": "Download", "x": 210.4850833131593, "y": 197.01241710567038, "type": "suit_node", "degree": 4.2139800285306706}, "target": {"index": 17, "name": "netzwerktagung", "x": 336.1389568509719, "y": 270.29959591946977, "type": "suit_node", "degree": 5.0271041369472185}, "weight": 0.2857142857142857, "weight_text": 0.2857142857142857, "type": "suit"}, {"source": {"index": 91, "name": "Flucht%20und%20Migration", "x": 447.18347451634327, "y": 206.60566600130454, "type": "suit_node", "degree": 6.011412268188303}, "target": {"index": 137, "name": "Antirassismus", "x": 450.18416557120963, "y": 207.05741839175496, "type": "suit_node", "degree": 6.738944365192582}, "weight": 0.275, "weight_text": 0.275, "type": "suit"}, {"source": {"index": 79, "name": "Gender,%20K%C3%B6rperbild%20und%20Sexualit%C3%A4t", "x": 311.4249498930926, "y": 202.26962798840407, "type": "suit_node", "degree": 4.4065620542082735}, "target": {"index": 77, "name": "schule-gegen-sexismus-projekttag-7-9-klasse", "x": 335.793393714585, "y": 268.99122501787474, "type": "suit_node", "degree": 5.562054208273894}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 79, "name": "Gender,%20K%C3%B6rperbild%20und%20Sexualit%C3%A4t", "x": 311.4249498930926, "y": 202.26962798840407, "type": "suit_node", "degree": 4.4065620542082735}, "target": {"index": 71, "name": "we-simply-are", "x": 287.0567688483068, "y": 135.55338626044545, "type": "suit_node", "degree": 4.171184022824536}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 42, "name": "Geschlecht%20und%20Sexualit%C3%A4t", "x": 451.45470059479663, "y": 160.54495869949284, "type": "suit_node", "degree": 6.653352353780313}, "target": {"index": 70, "name": "Altersvielfalt", "x": 458.0, "y": 159.86141857457432, "type": "suit_node", "degree": 5.519258202567761}, "weight": 0.21818181818181817, "weight_text": 0.21818181818181817, "type": "suit"}, {"source": {"index": 145, "name": "Venedigneu", "x": 306.02963549946526, "y": 164.126744321946, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 145, "name": "Venedigneu", "x": 306.02963549946526, "y": 164.126744321946, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 168, "name": "home", "x": 219.1818931212656, "y": 150.78477114816548, "type": "suit_node", "degree": 4.299572039942938}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 145, "name": "Venedigneu", "x": 306.02963549946526, "y": 164.126744321946, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 124, "name": "venedigneu", "x": 315.3245117021243, "y": 58.85790248072237, "type": "suit_node", "degree": 4.021398002853067}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 16, "name": "Vielfalt%20der%20Religionen", "x": 449.98085223730874, "y": 164.94049032896476, "type": "suit_node", "degree": 5.840228245363766}, "target": {"index": 97, "name": "Soziale%20Herkunft", "x": 456.09368167179724, "y": 164.41809742076634, "type": "suit_node", "degree": 6.118402282453638}, "weight": 0.21153846153846154, "weight_text": 0.21153846153846154, "type": "suit"}, {"source": {"index": 177, "name": "alles-fur-alle", "x": 295.06115317771787, "y": 108.72606821259396, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 177, "name": "alles-fur-alle", "x": 295.06115317771787, "y": 108.72606821259396, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 142, "name": "knowbody", "x": 275.3127242566235, "y": 165.04421942892787, "type": "suit_node", "degree": 4.320970042796006}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 48, "name": "andersartig-gedenken-on-stage", "x": 96.23228074361379, "y": 179.37232171713484, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 103, "name": "Leben%20mit%20Behinderung", "x": 97.10007778286307, "y": 180.18385605721247, "type": "suit_node", "degree": 7.8302425106990015}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 11, "name": "arbeiterkind.de", "x": 344.2990790836702, "y": 268.9384136660309, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 59, "name": "arrivalnews-einfach-besser-verstehen", "x": 403.6454550687128, "y": 213.19412298892038, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 70, "name": "Altersvielfalt", "x": 458.0, "y": 159.86141857457432, "type": "suit_node", "degree": 5.519258202567761}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 59, "name": "arrivalnews-einfach-besser-verstehen", "x": 403.6454550687128, "y": 213.19412298892038, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 91, "name": "Flucht%20und%20Migration", "x": 447.18347451634327, "y": 206.60566600130454, "type": "suit_node", "degree": 6.011412268188303}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 59, "name": "arrivalnews-einfach-besser-verstehen", "x": 403.6454550687128, "y": 213.19412298892038, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 9, "name": "konterbunt-einschreiten-fuer-demokratie", "x": 335.0584558218254, "y": 265.7364200815045, "type": "suit_node", "degree": 4.2781740370898715}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 76, "name": "auf-klo", "x": 207.3352721950242, "y": 152.3502231986041, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 76, "name": "auf-klo", "x": 207.3352721950242, "y": 152.3502231986041, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 22, "name": "genderdings.de", "x": 329.8275089012782, "y": 180.9730986453951, "type": "suit_node", "degree": 4.085592011412269}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 38, "name": "auszeichnung-weltethos-schule", "x": 267.92184105759776, "y": 107.88202530086619, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 38, "name": "auszeichnung-weltethos-schule", "x": 267.92184105759776, "y": 107.88202530086619, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 38, "name": "auszeichnung-weltethos-schule", "x": 267.92184105759776, "y": 107.88202530086619, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 38, "name": "auszeichnung-weltethos-schule", "x": 267.92184105759776, "y": 107.88202530086619, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 49, "name": "vinedig", "x": 328.88298610230345, "y": 172.89617156931428, "type": "suit_node", "degree": 9.135520684736091}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 38, "name": "auszeichnung-weltethos-schule", "x": 267.92184105759776, "y": 107.88202530086619, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 175, "name": "worldlab", "x": 433.361395249556, "y": 106.19699440861712, "type": "suit_node", "degree": 4.36376604850214}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 66, "name": "bbz-lebensart", "x": 281.6497112115438, "y": 158.37291512446274, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 153, "name": "Download", "x": 210.4850833131593, "y": 197.01241710567038, "type": "suit_node", "degree": 4.2139800285306706}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 66, "name": "bbz-lebensart", "x": 281.6497112115438, "y": 158.37291512446274, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 66, "name": "bbz-lebensart", "x": 281.6497112115438, "y": 158.37291512446274, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 26, "name": "colorful-classroom", "x": 343.73091056127663, "y": 271.3381662397611, "type": "suit_node", "degree": 4.36376604850214}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 66, "name": "bbz-lebensart", "x": 281.6497112115438, "y": 158.37291512446274, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 151, "name": "diversity-munchen-e.v", "x": 452.3585442813244, "y": 158.9804280704955, "type": "suit_node", "degree": 4.171184022824536}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 66, "name": "bbz-lebensart", "x": 281.6497112115438, "y": 158.37291512446274, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 164, "name": "bildmachen", "x": 384.5347245980463, "y": 242.77046219143662, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 137, "name": "Antirassismus", "x": 450.18416557120963, "y": 207.05741839175496, "type": "suit_node", "degree": 6.738944365192582}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 164, "name": "bildmachen", "x": 384.5347245980463, "y": 242.77046219143662, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 164, "name": "bildmachen", "x": 384.5347245980463, "y": 242.77046219143662, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 18, "name": "die-freiheit-die-ich-meine", "x": 335.7635391238749, "y": 263.7472182678913, "type": "suit_node", "degree": 4.470756062767475}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 178, "name": "bildungsmaterial-antirassismusarbeit", "x": 338.47121406014406, "y": 266.48341736431814, "type": "suit_node", "degree": 4.36376604850214}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.5625, "weight_text": 0.5625, "type": "suit"}, {"source": {"index": 25, "name": "bisexualitaet-und-schule", "x": 325.92692445069486, "y": 237.05829622955784, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 79, "name": "Gender,%20K%C3%B6rperbild%20und%20Sexualit%C3%A4t", "x": 311.4249498930926, "y": 202.26962798840407, "type": "suit_node", "degree": 4.4065620542082735}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 25, "name": "bisexualitaet-und-schule", "x": 325.92692445069486, "y": 237.05829622955784, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 8, "name": "blinc-workshops", "x": 310.953917821962, "y": 58.677103811113284, "type": "suit_node", "degree": 4.2139800285306706}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.2857142857142857, "weight_text": 0.2857142857142857, "type": "suit"}, {"source": {"index": 130, "name": "bundesnetzwerk-schule-der-vielfalt", "x": 398.06247294974736, "y": 216.3213454722171, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 149, "name": "Themen%20%C3%BCbergreifend", "x": 455.6718632761162, "y": 160.75769635162703, "type": "suit_node", "degree": 5.241084165477888}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 130, "name": "bundesnetzwerk-schule-der-vielfalt", "x": 398.06247294974736, "y": 216.3213454722171, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 126, "name": "cashless-muenchen", "x": 91.86624736232028, "y": 124.35216495009773, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 3, "name": "center-for-performing-arts", "x": 239.64424360824592, "y": 233.88813684123633, "type": "suit_node", "degree": 4.235378031383737}, "target": {"index": 103, "name": "Leben%20mit%20Behinderung", "x": 97.10007778286307, "y": 180.18385605721247, "type": "suit_node", "degree": 7.8302425106990015}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 3, "name": "center-for-performing-arts", "x": 239.64424360824592, "y": 233.88813684123633, "type": "suit_node", "degree": 4.235378031383737}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 54, "name": "click-digitale-trainings", "x": 90.93746234891684, "y": 124.98155890220757, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 119, "name": "colored-glasses", "x": 199.44006397812075, "y": 84.31053609884046, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 119, "name": "colored-glasses", "x": 199.44006397812075, "y": 84.31053609884046, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 119, "name": "colored-glasses", "x": 199.44006397812075, "y": 84.31053609884046, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 26, "name": "colorful-classroom", "x": 343.73091056127663, "y": 271.3381662397611, "type": "suit_node", "degree": 4.36376604850214}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.4166666666666667, "weight_text": 0.4166666666666667, "type": "suit"}, {"source": {"index": 56, "name": "connecting-the-dots", "x": 297.74981371840784, "y": 156.87118280915467, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 167, "name": "antianti", "x": 259.7306518653724, "y": 50.0, "type": "suit_node", "degree": 4.299572039942938}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 56, "name": "connecting-the-dots", "x": 297.74981371840784, "y": 156.87118280915467, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 18, "name": "die-freiheit-die-ich-meine", "x": 335.7635391238749, "y": 263.7472182678913, "type": "suit_node", "degree": 4.470756062767475}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 113, "name": "dialogmuseum-frankfurt-am-main", "x": 422.76098479419613, "y": 99.13351018360957, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 117, "name": "fingeralphabet-uebersetzer-mit-scratch", "x": 421.3944305002545, "y": 100.25726077442408, "type": "suit_node", "degree": 4.171184022824536}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 18, "name": "die-freiheit-die-ich-meine", "x": 335.7635391238749, "y": 263.7472182678913, "type": "suit_node", "degree": 4.470756062767475}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.21428571428571427, "weight_text": 0.21428571428571427, "type": "suit"}, {"source": {"index": 128, "name": "die-pastinaken", "x": 203.15485827659657, "y": 138.61406249873085, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 128, "name": "die-pastinaken", "x": 203.15485827659657, "y": 138.61406249873085, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 128, "name": "die-pastinaken", "x": 203.15485827659657, "y": 138.61406249873085, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 128, "name": "die-pastinaken", "x": 203.15485827659657, "y": 138.61406249873085, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 5, "name": "ueberUns", "x": 172.03460045054078, "y": 268.506968231384, "type": "suit_node", "degree": 9.5848787446505}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 171, "name": "direkiju-dialog-der-religionen-fuer-kinder-und-jugendliche", "x": 338.41641869869966, "y": 269.1952663952518, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 171, "name": "direkiju-dialog-der-religionen-fuer-kinder-und-jugendliche", "x": 338.41641869869966, "y": 269.1952663952518, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 171, "name": "direkiju-dialog-der-religionen-fuer-kinder-und-jugendliche", "x": 338.41641869869966, "y": 269.1952663952518, "type": "suit_node", "degree": 4.042796005706134}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 151, "name": "diversity-munchen-e.v", "x": 452.3585442813244, "y": 158.9804280704955, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 42, "name": "Geschlecht%20und%20Sexualit%C3%A4t", "x": 451.45470059479663, "y": 160.54495869949284, "type": "suit_node", "degree": 6.653352353780313}, "weight": 0.2857142857142857, "weight_text": 0.2857142857142857, "type": "suit"}, {"source": {"index": 81, "name": "eduki-standwithukraine", "x": 222.03069811669343, "y": 250.14037451256374, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 81, "name": "eduki-standwithukraine", "x": 222.03069811669343, "y": 250.14037451256374, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 34, "name": "mitmischen-madchen-zeigen-engagement", "x": 103.68988839977348, "y": 228.26180203199547, "type": "suit_node", "degree": 4.3423680456490725}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 138, "name": "einmal-brainwash-und-zuruck-verschworungsmythen-erleben", "x": 266.29622070943276, "y": 173.70823488229007, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.4, "weight_text": 0.4, "type": "suit"}, {"source": {"index": 138, "name": "einmal-brainwash-und-zuruck-verschworungsmythen-erleben", "x": 266.29622070943276, "y": 173.70823488229007, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 138, "name": "einmal-brainwash-und-zuruck-verschworungsmythen-erleben", "x": 266.29622070943276, "y": 173.70823488229007, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 174, "name": "eis-eine-inklusive-sprachlern-app", "x": 342.4674404676815, "y": 268.7593186662617, "type": "suit_node", "degree": 4.427960057061341}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 141, "name": "empfehlungen", "x": 212.89130721023545, "y": 61.787603919857574, "type": "suit_node", "degree": 6.61055634807418}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.475, "weight_text": 0.475, "type": "suit"}, {"source": {"index": 133, "name": "entwickle-deine-yoga-app", "x": 255.8729056753636, "y": 137.04565825789348, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 14, "name": "meet-a-jew", "x": 256.3356466156433, "y": 137.9106685344463, "type": "suit_node", "degree": 4.4065620542082735}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 108, "name": "everynamecounts", "x": 94.10478985410992, "y": 125.45476151096449, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 2, "name": "fach-und-lehrkrafte-fortbildungen-ufuq.de", "x": 385.8149735203296, "y": 227.58036393816715, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 2, "name": "fach-und-lehrkrafte-fortbildungen-ufuq.de", "x": 385.8149735203296, "y": 227.58036393816715, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 16, "name": "Vielfalt%20der%20Religionen", "x": 449.98085223730874, "y": 164.94049032896476, "type": "suit_node", "degree": 5.840228245363766}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 2, "name": "fach-und-lehrkrafte-fortbildungen-ufuq.de", "x": 385.8149735203296, "y": 227.58036393816715, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 2, "name": "fach-und-lehrkrafte-fortbildungen-ufuq.de", "x": 385.8149735203296, "y": 227.58036393816715, "type": "suit_node", "degree": 4.192582025677604}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 99, "name": "familienbande-ich-weiss-da-was-was-du-nicht-siehst", "x": 331.8725495857626, "y": 268.8192790838881, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 77, "name": "schule-gegen-sexismus-projekttag-7-9-klasse", "x": 335.793393714585, "y": 268.99122501787474, "type": "suit_node", "degree": 5.562054208273894}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 12, "name": "fluchterfahren", "x": 222.0903947654541, "y": 250.0217809309571, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 12, "name": "fluchterfahren", "x": 222.0903947654541, "y": 250.0217809309571, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 34, "name": "mitmischen-madchen-zeigen-engagement", "x": 103.68988839977348, "y": 228.26180203199547, "type": "suit_node", "degree": 4.3423680456490725}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 121, "name": "forderung-fur-schuler-innen", "x": 259.6371577478899, "y": 195.21366349904005, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 137, "name": "Antirassismus", "x": 450.18416557120963, "y": 207.05741839175496, "type": "suit_node", "degree": 6.738944365192582}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 121, "name": "forderung-fur-schuler-innen", "x": 259.6371577478899, "y": 195.21366349904005, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 114, "name": "miphgasch-begegnung-e.v", "x": 223.5805541446633, "y": 219.28427910509893, "type": "suit_node", "degree": 4.106990014265335}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 121, "name": "forderung-fur-schuler-innen", "x": 259.6371577478899, "y": 195.21366349904005, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 134, "name": "projektSuche", "x": 75.0, "y": 176.24587703235647, "type": "suit_node", "degree": 5.947218259629102}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 28, "name": "fuhrungen-und-projekte-der-gedenkstatte-roter-ochse-halle-saale", "x": 337.3107533747921, "y": 274.2635975259276, "type": "suit_node", "degree": 4.299572039942938}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 35, "name": "game-augen-auf", "x": 229.30282706472804, "y": 170.53309623054912, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 103, "name": "Leben%20mit%20Behinderung", "x": 97.10007778286307, "y": 180.18385605721247, "type": "suit_node", "degree": 7.8302425106990015}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 35, "name": "game-augen-auf", "x": 229.30282706472804, "y": 170.53309623054912, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 35, "name": "game-augen-auf", "x": 229.30282706472804, "y": 170.53309623054912, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 35, "name": "game-augen-auf", "x": 229.30282706472804, "y": 170.53309623054912, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 155, "name": "serious-game-hidden-codes", "x": 204.43301032726686, "y": 151.17778123324388, "type": "suit_node", "degree": 4.064194008559201}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 87, "name": "gender-benchmarking-tool", "x": 242.9948664745219, "y": 178.40968074254582, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.6666666666666666, "weight_text": 0.6666666666666666, "type": "suit"}, {"source": {"index": 87, "name": "gender-benchmarking-tool", "x": 242.9948664745219, "y": 178.40968074254582, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 87, "name": "gender-benchmarking-tool", "x": 242.9948664745219, "y": 178.40968074254582, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 22, "name": "genderdings.de", "x": 329.8275089012782, "y": 180.9730986453951, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.6666666666666666, "weight_text": 0.6666666666666666, "type": "suit"}, {"source": {"index": 22, "name": "genderdings.de", "x": 329.8275089012782, "y": 180.9730986453951, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 13, "name": "germandream-wertedialog", "x": 93.57211258338572, "y": 126.16976430264593, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 166, "name": "geschichte-inklusiv", "x": 313.5516242565751, "y": 57.555674898765744, "type": "suit_node", "degree": 4.320970042796006}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.375, "weight_text": 0.375, "type": "suit"}, {"source": {"index": 101, "name": "girls-hacker-school", "x": 158.23885775661822, "y": 243.11934953339744, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 36, "name": "klipp-klar", "x": 232.90864805845396, "y": 283.0, "type": "suit_node", "degree": 4.492154065620542}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 101, "name": "girls-hacker-school", "x": 158.23885775661822, "y": 243.11934953339744, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 67, "name": "liebesleben", "x": 83.55802736997285, "y": 203.24835504202375, "type": "suit_node", "degree": 4.14978601997147}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 156, "name": "hackathon-gegen-antisemitismus-einladung-zum-insta-live-talk", "x": 173.141934294703, "y": 266.6461253116696, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 5, "name": "ueberUns", "x": 172.03460045054078, "y": 268.506968231384, "type": "suit_node", "degree": 9.5848787446505}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 37, "name": "haydee-digitale-nachhilfe", "x": 211.43711928508603, "y": 84.46489046723823, "type": "suit_node", "degree": 4.2139800285306706}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.2222222222222222, "weight_text": 0.2222222222222222, "type": "suit"}, {"source": {"index": 37, "name": "haydee-digitale-nachhilfe", "x": 211.43711928508603, "y": 84.46489046723823, "type": "suit_node", "degree": 4.2139800285306706}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 168, "name": "home", "x": 219.1818931212656, "y": 150.78477114816548, "type": "suit_node", "degree": 4.299572039942938}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.2857142857142857, "weight_text": 0.2857142857142857, "type": "suit"}, {"source": {"index": 168, "name": "home", "x": 219.1818931212656, "y": 150.78477114816548, "type": "suit_node", "degree": 4.299572039942938}, "target": {"index": 49, "name": "vinedig", "x": 328.88298610230345, "y": 172.89617156931428, "type": "suit_node", "degree": 9.135520684736091}, "weight": 0.42857142857142855, "weight_text": 0.42857142857142855, "type": "suit"}, {"source": {"index": 82, "name": "identitat-vorurteile-muslimisch-in-deutschland-na-klar", "x": 382.387362090386, "y": 108.6784637578611, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 16, "name": "Vielfalt%20der%20Religionen", "x": 449.98085223730874, "y": 164.94049032896476, "type": "suit_node", "degree": 5.840228245363766}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 82, "name": "identitat-vorurteile-muslimisch-in-deutschland-na-klar", "x": 382.387362090386, "y": 108.6784637578611, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 10, "name": "in-gedenken-an-die-opfer-von-hanau", "x": 338.7520182532878, "y": 268.4588275767626, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 60, "name": "in.zirque-kuenstlerisches-bewegungslernen-im-inklusiven-kontext", "x": 234.5573849262556, "y": 210.5058771075491, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.6666666666666666, "weight_text": 0.6666666666666666, "type": "suit"}, {"source": {"index": 60, "name": "in.zirque-kuenstlerisches-bewegungslernen-im-inklusiven-kontext", "x": 234.5573849262556, "y": 210.5058771075491, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 92, "name": "index", "x": 449.68961023712177, "y": 165.833936187448, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 16, "name": "Vielfalt%20der%20Religionen", "x": 449.98085223730874, "y": 164.94049032896476, "type": "suit_node", "degree": 5.840228245363766}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 148, "name": "inklu-game", "x": 212.5634722850383, "y": 197.8473017509635, "type": "suit_node", "degree": 4.256776034236805}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 148, "name": "inklu-game", "x": 212.5634722850383, "y": 197.8473017509635, "type": "suit_node", "degree": 4.256776034236805}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 72, "name": "inklusion-buehnenreif", "x": 368.57587157578325, "y": 175.76985805729566, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 72, "name": "inklusion-buehnenreif", "x": 368.57587157578325, "y": 175.76985805729566, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 74, "name": "aktuelles", "x": 396.71792577764677, "y": 79.66967006659138, "type": "suit_node", "degree": 6.824536376604851}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 154, "name": "insta-live-mit-knowbody", "x": 285.11370903125885, "y": 119.91206315842506, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 69, "name": "kontakt", "x": 116.95316500121871, "y": 90.9669223854128, "type": "suit_node", "degree": 7.423680456490727}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 154, "name": "insta-live-mit-knowbody", "x": 285.11370903125885, "y": 119.91206315842506, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 158, "name": "rueckblick-vielfalt-netzwerkt-digital-7", "x": 443.6267023225844, "y": 119.39348019173852, "type": "suit_node", "degree": 4.727532097004279}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 154, "name": "insta-live-mit-knowbody", "x": 285.11370903125885, "y": 119.91206315842506, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 49, "name": "vinedig", "x": 328.88298610230345, "y": 172.89617156931428, "type": "suit_node", "degree": 9.135520684736091}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 90, "name": "insta-live-talk-mit-natalie-dedreux", "x": 313.4005021172395, "y": 59.829463619965495, "type": "suit_node", "degree": 4.663338088445078}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.3076923076923077, "weight_text": 0.3076923076923077, "type": "suit"}, {"source": {"index": 27, "name": "interreligious-peers", "x": 318.59499540927425, "y": 160.55324250142297, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 42, "name": "Geschlecht%20und%20Sexualit%C3%A4t", "x": 451.45470059479663, "y": 160.54495869949284, "type": "suit_node", "degree": 6.653352353780313}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 27, "name": "interreligious-peers", "x": 318.59499540927425, "y": 160.55324250142297, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 27, "name": "interreligious-peers", "x": 318.59499540927425, "y": 160.55324250142297, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 127, "name": "irmgard-app-fuer-alphabetisierung", "x": 334.3325484245964, "y": 270.2406144446104, "type": "suit_node", "degree": 4.2781740370898715}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.23076923076923078, "weight_text": 0.23076923076923078, "type": "suit"}, {"source": {"index": 163, "name": "joint-generations", "x": 91.34508704730699, "y": 125.56688203202641, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 83, "name": "jugendsprecher-kurs-tandem", "x": 218.76152432272465, "y": 226.02649705209265, "type": "suit_node", "degree": 4.256776034236805}, "target": {"index": 103, "name": "Leben%20mit%20Behinderung", "x": 97.10007778286307, "y": 180.18385605721247, "type": "suit_node", "degree": 7.8302425106990015}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 83, "name": "jugendsprecher-kurs-tandem", "x": 218.76152432272465, "y": 226.02649705209265, "type": "suit_node", "degree": 4.256776034236805}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 112, "name": "kidscourage-fur-kinderrechte", "x": 311.33937422459496, "y": 58.75700495264559, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 15, "name": "rueckblick-vielfalt-netzwerkt-digital-4", "x": 311.65899781436895, "y": 55.63103508419997, "type": "suit_node", "degree": 5.069900142653353}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 95, "name": "klar-und-einfach", "x": 337.4163292798611, "y": 264.0487026968775, "type": "suit_node", "degree": 4.4065620542082735}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.21428571428571427, "weight_text": 0.21428571428571427, "type": "suit"}, {"source": {"index": 61, "name": "kleine-pause-podcast", "x": 90.1046012995856, "y": 213.01016560883562, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 61, "name": "kleine-pause-podcast", "x": 90.1046012995856, "y": 213.01016560883562, "type": "suit_node", "degree": 4.106990014265335}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 78, "name": "klipp-klar?utm_source=sendinblue&utm_campaign=Literatur&utm_medium=email", "x": 275.1342298572437, "y": 165.07477826853813, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 78, "name": "klipp-klar?utm_source=sendinblue&utm_campaign=Literatur&utm_medium=email", "x": 275.1342298572437, "y": 165.07477826853813, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 23, "name": "klischeefrei", "x": 314.1699342857664, "y": 55.86224650575173, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 142, "name": "knowbody", "x": 275.3127242566235, "y": 165.04421942892787, "type": "suit_node", "degree": 4.320970042796006}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 142, "name": "knowbody", "x": 275.3127242566235, "y": 165.04421942892787, "type": "suit_node", "degree": 4.320970042796006}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 136, "name": "kompetent-durch-schule-und-ausbildung-trainings-fuer-daz-lerner-innen", "x": 337.49137000121624, "y": 266.7189876575154, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 136, "name": "kompetent-durch-schule-und-ausbildung-trainings-fuer-daz-lerner-innen", "x": 337.49137000121624, "y": 266.7189876575154, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 18, "name": "die-freiheit-die-ich-meine", "x": 335.7635391238749, "y": 263.7472182678913, "type": "suit_node", "degree": 4.470756062767475}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 115, "name": "konferenz", "x": 315.45532271631566, "y": 58.484300947358335, "type": "suit_node", "degree": 4.877318116975749}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 115, "name": "konferenz", "x": 315.45532271631566, "y": 58.484300947358335, "type": "suit_node", "degree": 4.877318116975749}, "target": {"index": 107, "name": "netzwerktreffen", "x": 315.79796144068524, "y": 55.64018736735718, "type": "suit_node", "degree": 4.641940085592012}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 9, "name": "konterbunt-einschreiten-fuer-demokratie", "x": 335.0584558218254, "y": 265.7364200815045, "type": "suit_node", "degree": 4.2781740370898715}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 44, "name": "kulturtauchen", "x": 255.7516271089836, "y": 105.0642631087262, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 44, "name": "kulturtauchen", "x": 255.7516271089836, "y": 105.0642631087262, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 44, "name": "kulturtauchen", "x": 255.7516271089836, "y": 105.0642631087262, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 80, "name": "splint-web-app-zur-individuellen-foerderplanung", "x": 257.8062883758156, "y": 196.02731654647522, "type": "suit_node", "degree": 4.14978601997147}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 44, "name": "kulturtauchen", "x": 255.7516271089836, "y": 105.0642631087262, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 150, "name": "sponsorships-for-students", "x": 295.96278392224735, "y": 112.74113915955687, "type": "suit_node", "degree": 4.14978601997147}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 46, "name": "lehrkraefte-diversitat-und-interkulturalitat-umgang-mit-vielfalt-in-der-schule", "x": 278.84577591258676, "y": 171.00676580300572, "type": "suit_node", "degree": 4.470756062767475}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2777777777777778, "weight_text": 0.2777777777777778, "type": "suit"}, {"source": {"index": 46, "name": "lehrkraefte-diversitat-und-interkulturalitat-umgang-mit-vielfalt-in-der-schule", "x": 278.84577591258676, "y": 171.00676580300572, "type": "suit_node", "degree": 4.470756062767475}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.2222222222222222, "weight_text": 0.2222222222222222, "type": "suit"}, {"source": {"index": 53, "name": "lernort-7xjung", "x": 317.4427057306734, "y": 54.81201142660645, "type": "suit_node", "degree": 4.2139800285306706}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.2222222222222222, "weight_text": 0.2222222222222222, "type": "suit"}, {"source": {"index": 100, "name": "liebesleben-queere-bildung-fur-jung-und-alt-respekt-beginnt-im-kopf", "x": 439.66256180682507, "y": 161.93440940005823, "type": "suit_node", "degree": 4.235378031383737}, "target": {"index": 42, "name": "Geschlecht%20und%20Sexualit%C3%A4t", "x": 451.45470059479663, "y": 160.54495869949284, "type": "suit_node", "degree": 6.653352353780313}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 93, "name": "make-superheroes-great-again", "x": 175.52595928827714, "y": 265.76134786385, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 5, "name": "ueberUns", "x": 172.03460045054078, "y": 268.506968231384, "type": "suit_node", "degree": 9.5848787446505}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 29, "name": "map-the-gap", "x": 256.5126296181418, "y": 175.83561459353066, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 29, "name": "map-the-gap", "x": 256.5126296181418, "y": 175.83561459353066, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 75, "name": "soorum-aufklarungsprojekt-zur-sexuellen-und-geschlechtlichen-vielfalt-fur-schulklassen-und-jugendgruppen", "x": 341.30535328842905, "y": 274.8235627794553, "type": "suit_node", "degree": 4.171184022824536}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 29, "name": "map-the-gap", "x": 256.5126296181418, "y": 175.83561459353066, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 105, "name": "unterrichtsmaterial-des-tamam-projekts", "x": 97.90152975647446, "y": 220.67336845745848, "type": "suit_node", "degree": 4.4065620542082735}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 7, "name": "mediathek-gegen-rassismus-und-diskriminierung", "x": 267.8990929962498, "y": 169.5271859484912, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 7, "name": "mediathek-gegen-rassismus-und-diskriminierung", "x": 267.8990929962498, "y": 169.5271859484912, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 7, "name": "mediathek-gegen-rassismus-und-diskriminierung", "x": 267.8990929962498, "y": 169.5271859484912, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 38, "name": "auszeichnung-weltethos-schule", "x": 267.92184105759776, "y": 107.88202530086619, "type": "suit_node", "degree": 4.171184022824536}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 7, "name": "mediathek-gegen-rassismus-und-diskriminierung", "x": 267.8990929962498, "y": 169.5271859484912, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 7, "name": "mediathek-gegen-rassismus-und-diskriminierung", "x": 267.8990929962498, "y": 169.5271859484912, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 7, "name": "mediathek-gegen-rassismus-und-diskriminierung", "x": 267.8990929962498, "y": 169.5271859484912, "type": "suit_node", "degree": 4.192582025677604}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 7, "name": "mediathek-gegen-rassismus-und-diskriminierung", "x": 267.8990929962498, "y": 169.5271859484912, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 75, "name": "soorum-aufklarungsprojekt-zur-sexuellen-und-geschlechtlichen-vielfalt-fur-schulklassen-und-jugendgruppen", "x": 341.30535328842905, "y": 274.8235627794553, "type": "suit_node", "degree": 4.171184022824536}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 147, "name": "mediathek-gegen-rassismus-und-diskriminierung?fbclid=PAAaZros0YJuOr0pD2_vb9oizM142AAXKIoK2FHHDtxv_NqPz-MuCKffjE2J0", "x": 340.39355441774813, "y": 269.7117809320901, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 14, "name": "meet-a-jew", "x": 256.3356466156433, "y": 137.9106685344463, "type": "suit_node", "degree": 4.4065620542082735}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2222222222222222, "weight_text": 0.2222222222222222, "type": "suit"}, {"source": {"index": 14, "name": "meet-a-jew", "x": 256.3356466156433, "y": 137.9106685344463, "type": "suit_node", "degree": 4.4065620542082735}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.2222222222222222, "weight_text": 0.2222222222222222, "type": "suit"}, {"source": {"index": 14, "name": "meet-a-jew", "x": 256.3356466156433, "y": 137.9106685344463, "type": "suit_node", "degree": 4.4065620542082735}, "target": {"index": 69, "name": "kontakt", "x": 116.95316500121871, "y": 90.9669223854128, "type": "suit_node", "degree": 7.423680456490727}, "weight": 0.2222222222222222, "weight_text": 0.2222222222222222, "type": "suit"}, {"source": {"index": 14, "name": "meet-a-jew", "x": 256.3356466156433, "y": 137.9106685344463, "type": "suit_node", "degree": 4.4065620542082735}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.2222222222222222, "weight_text": 0.2222222222222222, "type": "suit"}, {"source": {"index": 129, "name": "meet2respect", "x": 212.70970462440675, "y": 197.7525886699362, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 129, "name": "meet2respect", "x": 212.70970462440675, "y": 197.7525886699362, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 30, "name": "mehr-als-vergangenheit", "x": 327.61826058154645, "y": 162.14149654956654, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 30, "name": "mehr-als-vergangenheit", "x": 327.61826058154645, "y": 162.14149654956654, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 30, "name": "mehr-als-vergangenheit", "x": 327.61826058154645, "y": 162.14149654956654, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 30, "name": "mehr-als-vergangenheit", "x": 327.61826058154645, "y": 162.14149654956654, "type": "suit_node", "degree": 4.064194008559201}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 114, "name": "miphgasch-begegnung-e.v", "x": 223.5805541446633, "y": 219.28427910509893, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 114, "name": "miphgasch-begegnung-e.v", "x": 223.5805541446633, "y": 219.28427910509893, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 114, "name": "miphgasch-begegnung-e.v", "x": 223.5805541446633, "y": 219.28427910509893, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 5, "name": "ueberUns", "x": 172.03460045054078, "y": 268.506968231384, "type": "suit_node", "degree": 9.5848787446505}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 58, "name": "mut-zu-taten-vielfaltsbotschafter-innen-in-aktion", "x": 253.3958294875072, "y": 55.838603068512015, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 58, "name": "mut-zu-taten-vielfaltsbotschafter-innen-in-aktion", "x": 253.3958294875072, "y": 55.838603068512015, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 85, "name": "mys-toolbox", "x": 336.46482733234603, "y": 266.8598590487816, "type": "suit_node", "degree": 4.663338088445078}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.4230769230769231, "weight_text": 0.4230769230769231, "type": "suit"}, {"source": {"index": 68, "name": "ndc", "x": 197.5518984535035, "y": 121.8099485032785, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 68, "name": "ndc", "x": 197.5518984535035, "y": 121.8099485032785, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 73, "name": "verbrannte-orte", "x": 80.30341258594804, "y": 191.1969410460312, "type": "suit_node", "degree": 4.171184022824536}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 55, "name": "nest", "x": 302.143568583002, "y": 182.85931997199347, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 91, "name": "Flucht%20und%20Migration", "x": 447.18347451634327, "y": 206.60566600130454, "type": "suit_node", "degree": 6.011412268188303}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 55, "name": "nest", "x": 302.143568583002, "y": 182.85931997199347, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 97, "name": "Soziale%20Herkunft", "x": 456.09368167179724, "y": 164.41809742076634, "type": "suit_node", "degree": 6.118402282453638}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 55, "name": "nest", "x": 302.143568583002, "y": 182.85931997199347, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 55, "name": "nest", "x": 302.143568583002, "y": 182.85931997199347, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 43, "name": "nest?fbclid=PAAab_sDUDrXu36B3xQg2Ewi2fdqYSclLxOOABFMpjxrWJes9BiT2OZLbLCFU", "x": 339.69338956390544, "y": 268.8898624268834, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 17, "name": "netzwerktagung", "x": 336.1389568509719, "y": 270.29959591946977, "type": "suit_node", "degree": 5.0271041369472185}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.32142857142857145, "weight_text": 0.32142857142857145, "type": "suit"}, {"source": {"index": 107, "name": "netzwerktreffen", "x": 315.79796144068524, "y": 55.64018736735718, "type": "suit_node", "degree": 4.641940085592012}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.36363636363636365, "weight_text": 0.36363636363636365, "type": "suit"}, {"source": {"index": 107, "name": "netzwerktreffen", "x": 315.79796144068524, "y": 55.64018736735718, "type": "suit_node", "degree": 4.641940085592012}, "target": {"index": 115, "name": "konferenz", "x": 315.45532271631566, "y": 58.484300947358335, "type": "suit_node", "degree": 4.877318116975749}, "weight": 0.36363636363636365, "weight_text": 0.36363636363636365, "type": "suit"}, {"source": {"index": 169, "name": "ohrenkuss", "x": 221.40416398738088, "y": 173.35383745197709, "type": "suit_node", "degree": 4.299572039942938}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2222222222222222, "weight_text": 0.2222222222222222, "type": "suit"}, {"source": {"index": 169, "name": "ohrenkuss", "x": 221.40416398738088, "y": 173.35383745197709, "type": "suit_node", "degree": 4.299572039942938}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.2222222222222222, "weight_text": 0.2222222222222222, "type": "suit"}, {"source": {"index": 169, "name": "ohrenkuss", "x": 221.40416398738088, "y": 173.35383745197709, "type": "suit_node", "degree": 4.299572039942938}, "target": {"index": 47, "name": "touchdown-21", "x": 208.82535354273773, "y": 104.04847289428048, "type": "suit_node", "degree": 4.3423680456490725}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 6, "name": "parlamentssimulationen-europaparlament", "x": 285.62454067628295, "y": 101.89698046743584, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 6, "name": "parlamentssimulationen-europaparlament", "x": 285.62454067628295, "y": 101.89698046743584, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 6, "name": "parlamentssimulationen-europaparlament", "x": 285.62454067628295, "y": 101.89698046743584, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 49, "name": "vinedig", "x": 328.88298610230345, "y": 172.89617156931428, "type": "suit_node", "degree": 9.135520684736091}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 50, "name": "peer-academy", "x": 262.7742078480635, "y": 57.1089067158572, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 50, "name": "peer-academy", "x": 262.7742078480635, "y": 57.1089067158572, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 170, "name": "peer4queer", "x": 336.01823679072567, "y": 217.00387538789943, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 137, "name": "Antirassismus", "x": 450.18416557120963, "y": 207.05741839175496, "type": "suit_node", "degree": 6.738944365192582}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 170, "name": "peer4queer", "x": 336.01823679072567, "y": 217.00387538789943, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 42, "name": "Geschlecht%20und%20Sexualit%C3%A4t", "x": 451.45470059479663, "y": 160.54495869949284, "type": "suit_node", "degree": 6.653352353780313}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 170, "name": "peer4queer", "x": 336.01823679072567, "y": 217.00387538789943, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 5, "name": "ueberUns", "x": 172.03460045054078, "y": 268.506968231384, "type": "suit_node", "degree": 9.5848787446505}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 118, "name": "podcast-ojtbd", "x": 264.3333983447734, "y": 164.82780907239254, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 118, "name": "podcast-ojtbd", "x": 264.3333983447734, "y": 164.82780907239254, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 4, "name": "klassengedanken", "x": 213.8782246437843, "y": 277.2370693919888, "type": "suit_node", "degree": 4.4065620542082735}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 51, "name": "politik-in-berlin", "x": 342.66011662845045, "y": 270.33398967910705, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 162, "name": "pravention-von-muslimfeindlichkeit", "x": 338.2233396355765, "y": 267.43942093525106, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 109, "name": "prevent-beratungsstelle-berlin", "x": 235.60218129804082, "y": 211.03113635336447, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 109, "name": "prevent-beratungsstelle-berlin", "x": 235.60218129804082, "y": 211.03113635336447, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 109, "name": "prevent-beratungsstelle-berlin", "x": 235.60218129804082, "y": 211.03113635336447, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 140, "name": "ufuq.de-wie-wollen-wir-leben", "x": 343.91251676036654, "y": 273.6339288168442, "type": "suit_node", "degree": 4.2139800285306706}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 62, "name": "projektAnbieten", "x": 313.95690035242046, "y": 58.49392779058975, "type": "suit_node", "degree": 6.803138373751784}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.21428571428571427, "weight_text": 0.21428571428571427, "type": "suit"}, {"source": {"index": 165, "name": "quertanz", "x": 336.46798233605637, "y": 267.67921948844673, "type": "suit_node", "degree": 4.492154065620542}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.4090909090909091, "weight_text": 0.4090909090909091, "type": "suit"}, {"source": {"index": 98, "name": "relithek.de-ein-multimediaportal-zur-inter-religiosen-verstandigung-und-bildung", "x": 252.95846157367134, "y": 188.06740225483173, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.6, "weight_text": 0.6, "type": "suit"}, {"source": {"index": 98, "name": "relithek.de-ein-multimediaportal-zur-inter-religiosen-verstandigung-und-bildung", "x": 252.95846157367134, "y": 188.06740225483173, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 98, "name": "relithek.de-ein-multimediaportal-zur-inter-religiosen-verstandigung-und-bildung", "x": 252.95846157367134, "y": 188.06740225483173, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 19, "name": "rollisport-bewegt-schule", "x": 112.50671958947463, "y": 232.72465156330338, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 135, "name": "merkListe", "x": 110.10837785440867, "y": 232.39633075668164, "type": "suit_node", "degree": 5.0912981455064195}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 106, "name": "romaktiv-junge-rom-nja-und-sinti-zze-engagiert-in-berlin", "x": 455.69199729398434, "y": 165.35848603054154, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 97, "name": "Soziale%20Herkunft", "x": 456.09368167179724, "y": 164.41809742076634, "type": "suit_node", "degree": 6.118402282453638}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 15, "name": "rueckblick-vielfalt-netzwerkt-digital-4", "x": 311.65899781436895, "y": 55.63103508419997, "type": "suit_node", "degree": 5.069900142653353}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.20689655172413793, "weight_text": 0.20689655172413793, "type": "suit"}, {"source": {"index": 94, "name": "rueckblick-vielfalt-netzwerkt-digital-5", "x": 275.28458755112854, "y": 97.72954354449712, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 38, "name": "auszeichnung-weltethos-schule", "x": 267.92184105759776, "y": 107.88202530086619, "type": "suit_node", "degree": 4.171184022824536}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 94, "name": "rueckblick-vielfalt-netzwerkt-digital-5", "x": 275.28458755112854, "y": 97.72954354449712, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.4, "weight_text": 0.4, "type": "suit"}, {"source": {"index": 94, "name": "rueckblick-vielfalt-netzwerkt-digital-5", "x": 275.28458755112854, "y": 97.72954354449712, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 31, "name": "rueckblick-vielfalt-netzwerkt-digital-antirassismus-und-themenubergreifend-3", "x": 219.89336535242782, "y": 161.01352784200708, "type": "suit_node", "degree": 4.128388017118402}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 20, "name": "rueckblick-vielfalt-netzwerkt-digital-8", "x": 334.6563425203499, "y": 222.38233189459737, "type": "suit_node", "degree": 4.2139800285306706}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 20, "name": "rueckblick-vielfalt-netzwerkt-digital-8", "x": 334.6563425203499, "y": 222.38233189459737, "type": "suit_node", "degree": 4.2139800285306706}, "target": {"index": 49, "name": "vinedig", "x": 328.88298610230345, "y": 172.89617156931428, "type": "suit_node", "degree": 9.135520684736091}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 31, "name": "rueckblick-vielfalt-netzwerkt-digital-antirassismus-und-themenubergreifend-3", "x": 219.89336535242782, "y": 161.01352784200708, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 31, "name": "rueckblick-vielfalt-netzwerkt-digital-antirassismus-und-themenubergreifend-3", "x": 219.89336535242782, "y": 161.01352784200708, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 31, "name": "rueckblick-vielfalt-netzwerkt-digital-antirassismus-und-themenubergreifend-3", "x": 219.89336535242782, "y": 161.01352784200708, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 5, "name": "ueberUns", "x": 172.03460045054078, "y": 268.506968231384, "type": "suit_node", "degree": 9.5848787446505}, "weight": 0.4, "weight_text": 0.4, "type": "suit"}, {"source": {"index": 39, "name": "rueckblick-vielfalt-netzwerkt-digital-antirassismus-und-themenubergreifend-4", "x": 393.7217246353988, "y": 81.59741551457614, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 74, "name": "aktuelles", "x": 396.71792577764677, "y": 79.66967006659138, "type": "suit_node", "degree": 6.824536376604851}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 39, "name": "rueckblick-vielfalt-netzwerkt-digital-antirassismus-und-themenubergreifend-4", "x": 393.7217246353988, "y": 81.59741551457614, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 39, "name": "rueckblick-vielfalt-netzwerkt-digital-antirassismus-und-themenubergreifend-4", "x": 393.7217246353988, "y": 81.59741551457614, "type": "suit_node", "degree": 4.085592011412269}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 84, "name": "rueckblick-vielfalt-netzwerkt-digital-interreligioser-dialog-und-soziale-herkunft-2", "x": 354.2647412151509, "y": 67.00802651957167, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 84, "name": "rueckblick-vielfalt-netzwerkt-digital-interreligioser-dialog-und-soziale-herkunft-2", "x": 354.2647412151509, "y": 67.00802651957167, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 39, "name": "rueckblick-vielfalt-netzwerkt-digital-antirassismus-und-themenubergreifend-4", "x": 393.7217246353988, "y": 81.59741551457614, "type": "suit_node", "degree": 4.085592011412269}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 104, "name": "rueckblick-vielfalt-netzwerkt-digital-migration-und-behinderung", "x": 258.81821671516565, "y": 67.61987383891913, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 41, "name": "netzwerktagung-so-war-es", "x": 163.3723413045767, "y": 68.21853225256307, "type": "suit_node", "degree": 5.005706134094151}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 104, "name": "rueckblick-vielfalt-netzwerkt-digital-migration-und-behinderung", "x": 258.81821671516565, "y": 67.61987383891913, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 84, "name": "rueckblick-vielfalt-netzwerkt-digital-interreligioser-dialog-und-soziale-herkunft-2", "x": 354.2647412151509, "y": 67.00802651957167, "type": "suit_node", "degree": 4.085592011412269}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 52, "name": "salvia-der-barrierefreie-bildungsgarten", "x": 225.93899970331384, "y": 161.77291057426658, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 52, "name": "salvia-der-barrierefreie-bildungsgarten", "x": 225.93899970331384, "y": 161.77291057426658, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 52, "name": "salvia-der-barrierefreie-bildungsgarten", "x": 225.93899970331384, "y": 161.77291057426658, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 131, "name": "say-my-name", "x": 337.17162080290865, "y": 265.1608631959399, "type": "suit_node", "degree": 4.256776034236805}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2727272727272727, "weight_text": 0.2727272727272727, "type": "suit"}, {"source": {"index": 32, "name": "schlau-niedersachsen", "x": 227.04534399043106, "y": 115.53454500478517, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 79, "name": "Gender,%20K%C3%B6rperbild%20und%20Sexualit%C3%A4t", "x": 311.4249498930926, "y": 202.26962798840407, "type": "suit_node", "degree": 4.4065620542082735}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 32, "name": "schlau-niedersachsen", "x": 227.04534399043106, "y": 115.53454500478517, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 32, "name": "schlau-niedersachsen", "x": 227.04534399043106, "y": 115.53454500478517, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 69, "name": "kontakt", "x": 116.95316500121871, "y": 90.9669223854128, "type": "suit_node", "degree": 7.423680456490727}, "weight": 0.6666666666666666, "weight_text": 0.6666666666666666, "type": "suit"}, {"source": {"index": 24, "name": "schlau-nrw", "x": 343.45439456757765, "y": 275.1132705414874, "type": "suit_node", "degree": 4.2139800285306706}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 122, "name": "schlau-rlp", "x": 256.7512036679709, "y": 155.27399746661632, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 137, "name": "Antirassismus", "x": 450.18416557120963, "y": 207.05741839175496, "type": "suit_node", "degree": 6.738944365192582}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 122, "name": "schlau-rlp", "x": 256.7512036679709, "y": 155.27399746661632, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 122, "name": "schlau-rlp", "x": 256.7512036679709, "y": 155.27399746661632, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 122, "name": "schlau-rlp", "x": 256.7512036679709, "y": 155.27399746661632, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 21, "name": "fuma-lernkarten", "x": 142.3099695894606, "y": 76.76490329538754, "type": "suit_node", "degree": 4.171184022824536}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 122, "name": "schlau-rlp", "x": 256.7512036679709, "y": 155.27399746661632, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 33, "name": "schnittstelle-geschlecht", "x": 136.58501551879806, "y": 96.53204071595154, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.4, "weight_text": 0.4, "type": "suit"}, {"source": {"index": 33, "name": "schnittstelle-geschlecht", "x": 136.58501551879806, "y": 96.53204071595154, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 77, "name": "schule-gegen-sexismus-projekttag-7-9-klasse", "x": 335.793393714585, "y": 268.99122501787474, "type": "suit_node", "degree": 5.562054208273894}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.30303030303030304, "weight_text": 0.30303030303030304, "type": "suit"}, {"source": {"index": 155, "name": "serious-game-hidden-codes", "x": 204.43301032726686, "y": 151.17778123324388, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 155, "name": "serious-game-hidden-codes", "x": 204.43301032726686, "y": 151.17778123324388, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 155, "name": "serious-game-hidden-codes", "x": 204.43301032726686, "y": 151.17778123324388, "type": "suit_node", "degree": 4.064194008559201}, "target": {"index": 5, "name": "ueberUns", "x": 172.03460045054078, "y": 268.506968231384, "type": "suit_node", "degree": 9.5848787446505}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 125, "name": "sibels-s-journey", "x": 286.40576690129, "y": 183.39535332373543, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.4, "weight_text": 0.4, "type": "suit"}, {"source": {"index": 125, "name": "sibels-s-journey", "x": 286.40576690129, "y": 183.39535332373543, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 111, "name": "sichtweisen-kurzgeschichten-cbm", "x": 339.79712202057806, "y": 266.7243668286607, "type": "suit_node", "degree": 4.620542082738944}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.36, "weight_text": 0.36, "type": "suit"}, {"source": {"index": 75, "name": "soorum-aufklarungsprojekt-zur-sexuellen-und-geschlechtlichen-vielfalt-fur-schulklassen-und-jugendgruppen", "x": 341.30535328842905, "y": 274.8235627794553, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2857142857142857, "weight_text": 0.2857142857142857, "type": "suit"}, {"source": {"index": 80, "name": "splint-web-app-zur-individuellen-foerderplanung", "x": 257.8062883758156, "y": 196.02731654647522, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 0, "name": "", "x": 339.8236991530906, "y": 273.80042489549743, "type": "suit_node", "degree": 7.7018544935805995}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 80, "name": "splint-web-app-zur-individuellen-foerderplanung", "x": 257.8062883758156, "y": 196.02731654647522, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 91, "name": "Flucht%20und%20Migration", "x": 447.18347451634327, "y": 206.60566600130454, "type": "suit_node", "degree": 6.011412268188303}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 80, "name": "splint-web-app-zur-individuellen-foerderplanung", "x": 257.8062883758156, "y": 196.02731654647522, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 80, "name": "splint-web-app-zur-individuellen-foerderplanung", "x": 257.8062883758156, "y": 196.02731654647522, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 80, "name": "splint-web-app-zur-individuellen-foerderplanung", "x": 257.8062883758156, "y": 196.02731654647522, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 78, "name": "klipp-klar?utm_source=sendinblue&utm_campaign=Literatur&utm_medium=email", "x": 275.1342298572437, "y": 165.07477826853813, "type": "suit_node", "degree": 4.085592011412269}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 80, "name": "splint-web-app-zur-individuellen-foerderplanung", "x": 257.8062883758156, "y": 196.02731654647522, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 44, "name": "kulturtauchen", "x": 255.7516271089836, "y": 105.0642631087262, "type": "suit_node", "degree": 4.14978601997147}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 80, "name": "splint-web-app-zur-individuellen-foerderplanung", "x": 257.8062883758156, "y": 196.02731654647522, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 34, "name": "mitmischen-madchen-zeigen-engagement", "x": 103.68988839977348, "y": 228.26180203199547, "type": "suit_node", "degree": 4.3423680456490725}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 150, "name": "sponsorships-for-students", "x": 295.96278392224735, "y": 112.74113915955687, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 137, "name": "Antirassismus", "x": 450.18416557120963, "y": 207.05741839175496, "type": "suit_node", "degree": 6.738944365192582}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 150, "name": "sponsorships-for-students", "x": 295.96278392224735, "y": 112.74113915955687, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 44, "name": "kulturtauchen", "x": 255.7516271089836, "y": 105.0642631087262, "type": "suit_node", "degree": 4.14978601997147}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 150, "name": "sponsorships-for-students", "x": 295.96278392224735, "y": 112.74113915955687, "type": "suit_node", "degree": 4.14978601997147}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.75, "weight_text": 0.75, "type": "suit"}, {"source": {"index": 116, "name": "spuren-auf-papier", "x": 341.44818098620266, "y": 266.2249946524048, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 57, "name": "start-vielfalt-netzwerk-digital", "x": 177.94429752000815, "y": 263.9430772140465, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 5, "name": "ueberUns", "x": 172.03460045054078, "y": 268.506968231384, "type": "suit_node", "degree": 9.5848787446505}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 172, "name": "stattwerkstatt", "x": 280.63795550437237, "y": 187.75266458310833, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.4, "weight_text": 0.4, "type": "suit"}, {"source": {"index": 172, "name": "stattwerkstatt", "x": 280.63795550437237, "y": 187.75266458310833, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 74, "name": "aktuelles", "x": 396.71792577764677, "y": 79.66967006659138, "type": "suit_node", "degree": 6.824536376604851}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 172, "name": "stattwerkstatt", "x": 280.63795550437237, "y": 187.75266458310833, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 134, "name": "projektSuche", "x": 75.0, "y": 176.24587703235647, "type": "suit_node", "degree": 5.947218259629102}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 144, "name": "stories-for-tomorrow-fur-lehrende-multiplikator-innen-fokus-antisemitismuskritische-bildung", "x": 335.77612561069225, "y": 272.2482456746961, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 102, "name": "team-meeting-im-tuechtig-berlin", "x": 324.6115492889676, "y": 178.51285419882174, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 137, "name": "Antirassismus", "x": 450.18416557120963, "y": 207.05741839175496, "type": "suit_node", "degree": 6.738944365192582}, "weight": 0.4, "weight_text": 0.4, "type": "suit"}, {"source": {"index": 102, "name": "team-meeting-im-tuechtig-berlin", "x": 324.6115492889676, "y": 178.51285419882174, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 156, "name": "hackathon-gegen-antisemitismus-einladung-zum-insta-live-talk", "x": 173.141934294703, "y": 266.6461253116696, "type": "suit_node", "degree": 4.021398002853067}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 102, "name": "team-meeting-im-tuechtig-berlin", "x": 324.6115492889676, "y": 178.51285419882174, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 102, "name": "team-meeting-im-tuechtig-berlin", "x": 324.6115492889676, "y": 178.51285419882174, "type": "suit_node", "degree": 4.106990014265335}, "target": {"index": 49, "name": "vinedig", "x": 328.88298610230345, "y": 172.89617156931428, "type": "suit_node", "degree": 9.135520684736091}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 63, "name": "the-unstoppables", "x": 281.79871062364543, "y": 175.84598940756098, "type": "suit_node", "degree": 4.256776034236805}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.42857142857142855, "weight_text": 0.42857142857142855, "type": "suit"}, {"source": {"index": 63, "name": "the-unstoppables", "x": 281.79871062364543, "y": 175.84598940756098, "type": "suit_node", "degree": 4.256776034236805}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.2857142857142857, "weight_text": 0.2857142857142857, "type": "suit"}, {"source": {"index": 47, "name": "touchdown-21", "x": 208.82535354273773, "y": 104.04847289428048, "type": "suit_node", "degree": 4.3423680456490725}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 47, "name": "touchdown-21", "x": 208.82535354273773, "y": 104.04847289428048, "type": "suit_node", "degree": 4.3423680456490725}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 47, "name": "touchdown-21", "x": 208.82535354273773, "y": 104.04847289428048, "type": "suit_node", "degree": 4.3423680456490725}, "target": {"index": 169, "name": "ohrenkuss", "x": 221.40416398738088, "y": 173.35383745197709, "type": "suit_node", "degree": 4.299572039942938}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 47, "name": "touchdown-21", "x": 208.82535354273773, "y": 104.04847289428048, "type": "suit_node", "degree": 4.3423680456490725}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 139, "name": "touchdown-21?fbclid=PAAaZkWBwuVkDkC0wvO-4hyo2rKoFh6IMSuludPePH0Qt_I9Q3lRZ-3D3iB0o", "x": 219.84768932508177, "y": 173.51507656733327, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 169, "name": "ohrenkuss", "x": 221.40416398738088, "y": 173.35383745197709, "type": "suit_node", "degree": 4.299572039942938}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 88, "name": "trans-ja-und", "x": 307.99566609269436, "y": 154.20415086227783, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 49, "name": "vinedig", "x": 328.88298610230345, "y": 172.89617156931428, "type": "suit_node", "degree": 9.135520684736091}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 88, "name": "trans-ja-und", "x": 307.99566609269436, "y": 154.20415086227783, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 71, "name": "we-simply-are", "x": 287.0567688483068, "y": 135.55338626044545, "type": "suit_node", "degree": 4.171184022824536}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 123, "name": "ueberUns?fbclid=PAAaY_I5XXEE8l4KhUt-DWTJW6pA-KheqcBEp6NagH8FQDxwgcUORxv9wsFfc", "x": 174.86703332893921, "y": 267.16964435942293, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 5, "name": "ueberUns", "x": 172.03460045054078, "y": 268.506968231384, "type": "suit_node", "degree": 9.5848787446505}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 140, "name": "ufuq.de-wie-wollen-wir-leben", "x": 343.91251676036654, "y": 273.6339288168442, "type": "suit_node", "degree": 4.2139800285306706}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2857142857142857, "weight_text": 0.2857142857142857, "type": "suit"}, {"source": {"index": 160, "name": "ultraviolett-stories", "x": 424.0613697392999, "y": 120.11506549020184, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 42, "name": "Geschlecht%20und%20Sexualit%C3%A4t", "x": 451.45470059479663, "y": 160.54495869949284, "type": "suit_node", "degree": 6.653352353780313}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 160, "name": "ultraviolett-stories", "x": 424.0613697392999, "y": 120.11506549020184, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 74, "name": "aktuelles", "x": 396.71792577764677, "y": 79.66967006659138, "type": "suit_node", "degree": 6.824536376604851}, "weight": 0.3333333333333333, "weight_text": 0.3333333333333333, "type": "suit"}, {"source": {"index": 124, "name": "venedigneu", "x": 315.3245117021243, "y": 58.85790248072237, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 107, "name": "netzwerktreffen", "x": 315.79796144068524, "y": 55.64018736735718, "type": "suit_node", "degree": 4.641940085592012}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 96, "name": "vielfalt-in-schulen", "x": 327.66266964863354, "y": 162.41602453086006, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 96, "name": "vielfalt-in-schulen", "x": 327.66266964863354, "y": 162.41602453086006, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 96, "name": "vielfalt-in-schulen", "x": 327.66266964863354, "y": 162.41602453086006, "type": "suit_node", "degree": 4.128388017118402}, "target": {"index": 49, "name": "vinedig", "x": 328.88298610230345, "y": 172.89617156931428, "type": "suit_node", "degree": 9.135520684736091}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 45, "name": "vielfalt-mediathek", "x": 225.78534069803732, "y": 161.8374183426682, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 45, "name": "vielfalt-mediathek", "x": 225.78534069803732, "y": 161.8374183426682, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 45, "name": "vielfalt-mediathek", "x": 225.78534069803732, "y": 161.8374183426682, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 152, "name": "vielfalt-netzwerkt-digital-antirassismus-und-gender", "x": 331.5449882417476, "y": 172.60989439544335, "type": "suit_node", "degree": 4.2139800285306706}, "target": {"index": 49, "name": "vinedig", "x": 328.88298610230345, "y": 172.89617156931428, "type": "suit_node", "degree": 9.135520684736091}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 65, "name": "vielfalt-netzwerkt-im-livestream", "x": 334.8190347217041, "y": 266.7332471215103, "type": "suit_node", "degree": 4.57774607703281}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2608695652173913, "weight_text": 0.2608695652173913, "type": "suit"}, {"source": {"index": 49, "name": "vinedig", "x": 328.88298610230345, "y": 172.89617156931428, "type": "suit_node", "degree": 9.135520684736091}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.29850746268656714, "weight_text": 0.29850746268656714, "type": "suit"}, {"source": {"index": 49, "name": "vinedig", "x": 328.88298610230345, "y": 172.89617156931428, "type": "suit_node", "degree": 9.135520684736091}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.20149253731343283, "weight_text": 0.20149253731343283, "type": "suit"}, {"source": {"index": 64, "name": "vinedig?fbclid=IwAR0LU792h7K7ZJH9qqbtlld5D2iYBZ_VGjohgYVzN3zHAnGD3B30zNXoWVI", "x": 339.7950418604066, "y": 270.3669917862695, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 71, "name": "we-simply-are", "x": 287.0567688483068, "y": 135.55338626044545, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 79, "name": "Gender,%20K%C3%B6rperbild%20und%20Sexualit%C3%A4t", "x": 311.4249498930926, "y": 202.26962798840407, "type": "suit_node", "degree": 4.4065620542082735}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 71, "name": "we-simply-are", "x": 287.0567688483068, "y": 135.55338626044545, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 42, "name": "Geschlecht%20und%20Sexualit%C3%A4t", "x": 451.45470059479663, "y": 160.54495869949284, "type": "suit_node", "degree": 6.653352353780313}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 71, "name": "we-simply-are", "x": 287.0567688483068, "y": 135.55338626044545, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 103, "name": "Leben%20mit%20Behinderung", "x": 97.10007778286307, "y": 180.18385605721247, "type": "suit_node", "degree": 7.8302425106990015}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 71, "name": "we-simply-are", "x": 287.0567688483068, "y": 135.55338626044545, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 71, "name": "we-simply-are", "x": 287.0567688483068, "y": 135.55338626044545, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 62, "name": "projektAnbieten", "x": 313.95690035242046, "y": 58.49392779058975, "type": "suit_node", "degree": 6.803138373751784}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 71, "name": "we-simply-are", "x": 287.0567688483068, "y": 135.55338626044545, "type": "suit_node", "degree": 4.171184022824536}, "target": {"index": 88, "name": "trans-ja-und", "x": 307.99566609269436, "y": 154.20415086227783, "type": "suit_node", "degree": 4.085592011412269}, "weight": 0.2, "weight_text": 0.2, "type": "suit"}, {"source": {"index": 176, "name": "wen-siehst-du", "x": 203.4644745200379, "y": 192.48455947627858, "type": "suit_node", "degree": 4.235378031383737}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2727272727272727, "weight_text": 0.2727272727272727, "type": "suit"}, {"source": {"index": 176, "name": "wen-siehst-du", "x": 203.4644745200379, "y": 192.48455947627858, "type": "suit_node", "degree": 4.235378031383737}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.36363636363636365, "weight_text": 0.36363636363636365, "type": "suit"}, {"source": {"index": 40, "name": "werde-volunteer-special-olympics-world-games-berlin-2023", "x": 337.65194653242656, "y": 265.8932841086031, "type": "suit_node", "degree": 6.5249643366619114}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.47619047619047616, "weight_text": 0.47619047619047616, "type": "suit"}, {"source": {"index": 86, "name": "wheelmap-macht-schule", "x": 340.4907087433882, "y": 265.78176186454834, "type": "suit_node", "degree": 4.192582025677604}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 0.2222222222222222, "weight_text": 0.2222222222222222, "type": "suit"}, {"source": {"index": 157, "name": "wheelmap-macht-schule-schulmaterial-zum-thema-barrierefreiheit", "x": 314.06808436660833, "y": 54.81425269198559, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 143, "name": "homepage", "x": 314.7952541552488, "y": 52.4114513892738, "type": "suit_node", "degree": 34.0}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 161, "name": "widerstand-gegen-rassismus", "x": 136.76781775681923, "y": 96.66188686396347, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 161, "name": "widerstand-gegen-rassismus", "x": 136.76781775681923, "y": 96.66188686396347, "type": "suit_node", "degree": 4.085592011412269}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.25, "weight_text": 0.25, "type": "suit"}, {"source": {"index": 132, "name": "workshop-fur-fachkrafte-sozial-engagierte-eltern-und-interessierte", "x": 330.7223890787374, "y": 109.39815443126489, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 42, "name": "Geschlecht%20und%20Sexualit%C3%A4t", "x": 451.45470059479663, "y": 160.54495869949284, "type": "suit_node", "degree": 6.653352353780313}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 132, "name": "workshop-fur-fachkrafte-sozial-engagierte-eltern-und-interessierte", "x": 330.7223890787374, "y": 109.39815443126489, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 159, "name": "youth-leadership-datenbank", "x": 338.4681895904556, "y": 270.55368688409663, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 173, "name": "Verweis", "x": 340.43591047419847, "y": 271.8788618206338, "type": "suit_node", "degree": 15.747503566333808}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}, {"source": {"index": 120, "name": "zweitzeugen", "x": 213.64047838773598, "y": 62.70756041647123, "type": "suit_node", "degree": 4.042796005706134}, "target": {"index": 89, "name": "projektsuche", "x": 209.9834624304131, "y": 58.24325971937498, "type": "suit_node", "degree": 10.697574893009985}, "weight": 0.5, "weight_text": 0.5, "type": "suit"}, {"source": {"index": 110, "name": "zwischentoene", "x": 87.4170036636833, "y": 124.27028841803431, "type": "suit_node", "degree": 4.021398002853067}, "target": {"index": 1, "name": "Ziel-Konversion", "x": 84.84469398929166, "y": 123.72224895426729, "type": "suit_node", "degree": 12.323823109843081}, "weight": 1.0, "weight_text": 1.0, "type": "suit"}]);
+
+    if (!1) {
+      $('.percent-checkbox').hide();
+    }
+
+  </script>
+
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+  <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+</body>
+</html>
