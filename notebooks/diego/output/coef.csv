@@ -1,0 +1,54 @@
+feature,coef
+languageCode_de-de,1.337384194494708
+deviceType_Desktop,0.7994087016692124
+languageCode_de,0.7089030271383306
+deviceBrand_unbekannt,0.6245956835309553
+browserName_Firefox,0.5997399530797575
+browserName_Mobile Safari,0.5646528559162036
+browserName_Opera,0.5186115513249098
+deviceBrand_LG,0.45643395625679456
+deviceBrand_Fairphone,0.3062500043594654
+browserName_Microsoft Edge,0.2599092229907029
+browserName_Safari,0.09184801723464463
+browserName_Firefox Mobile,0.09031604813110083
+browserName_Chrome Mobile,0.08762441213448814
+deviceBrand_Apple,0.06924920420135461
+browserName_Google Search App,0.023842438667674073
+deviceBrand_Google,0.013864922980847278
+deviceType_Phablet,-0.0017460792470298148
+browserName_Chrome,-0.01073916553514021
+languageCode_ar-sy,-0.017650990720798412
+languageCode_de-at,-0.023047524105687757
+languageCode_de-gb,-0.023047524105687757
+languageCode_es-mx,-0.026159229661577695
+languageCode_en-ca,-0.02793084735323562
+browserName_Chrome Mobile iOS,-0.02793084735323562
+languageCode_ru,-0.04900575609791362
+languageCode_es,-0.04900575609791362
+languageCode_en-de,-0.05269635364760898
+browserName_Samsung Browser,-0.057317405458600625
+deviceBrand_Lenovo,-0.06434424303692382
+languageCode_es-es,-0.07188234300532331
+deviceBrand_Motorola,-0.0985503606779886
+deviceBrand_Nokia,-0.09855036067798863
+browserName_Headless Chrome,-0.09943174125722934
+browserName_Ecosia,-0.11978883551583291
+deviceBrand_POCO,-0.12240581932526866
+browserName_Edge WebView,-0.13303801030495693
+languageCode_sv,-0.14176832569568948
+languageCode_tr-tr,-0.15423237048210897
+languageCode_fr,-0.1820456996310806
+languageCode_en-us,-0.18656227478423001
+deviceType_Smartphone,-0.20832413555799312
+languageCode_en,-0.2093389598376887
+languageCode_nl-nl,-0.20933895983768872
+browserName_LinkedIn,-0.22880446571924604
+deviceBrand_Huawei,-0.25735352919894966
+browserName_Facebook,-0.29191473310985117
+browserName_MIUI Browser,-0.29395816182261664
+deviceBrand_Xiaomi,-0.2966640721084036
+browserName_Instagram App,-0.4239840240073416
+deviceBrand_Samsung,-0.5318272408243202
+browserName_Brave,-0.5489389639158562
+deviceType_Tablet,-0.5886403413846154
+languageCode_en-gb,-0.6218761610892313
