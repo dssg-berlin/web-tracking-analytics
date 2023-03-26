@@ -3,8 +3,11 @@ Third project for the 2023 Datathon. It's a project with the non-profit organisa
 
 https://www.wirfuervielfalt.de/
 
+## Final Report
+
+![image](https://user-images.githubusercontent.com/8211411/227771997-a8949965-c50b-4e9b-8f4b-f8539ce5e251.png)
+
 ## Data Challenge
-GDrive Folder containing the Data and Info Sheet: https://drive.google.com/drive/folders/18DvG7Eih3ycBAF8OZEbjaYFyAqrCZGeb
 
 ### Recommended Skills
 * Analytic Tool of your Choice (Python, R, ...)
@@ -15,28 +18,28 @@ GDrive Folder containing the Data and Info Sheet: https://drive.google.com/drive
 * Basic NLP to Identify Keywords of a Document
 
 ### Group 1) Visitors
-- [ ] Are there patterns of visitor return/retention or duration of stay with page content or other features?
-- [ ] Do sources or webpages correlate with visit duration?
-- [ ] How many visits to the site? How many unique visitors?
+- [x] Are there patterns of visitor return/retention or duration of stay with page content or other features?
+- [x] Do sources or webpages correlate with visit duration?
+- [x] How many visits to the site? How many unique visitors?
 
 ### Group 2) Sources
-- [ ] Visualize the referring sources (search engines/social media).
-- [ ] Calculate the Bounce Rate (single-page sessions divided by all sessions).
+- [x] Visualize the referring sources (search engines/social media).
+- [x] Calculate the Bounce Rate (single-page sessions divided by all sessions).
 
 ### Group 3) Content
-- [ ] What are the top landing pages? What are the keywords of the top landing pages? 
-- [ ] What are the top keywords by location? Are there other locations with similar interest as indicated by keywords?
-- [ ] Is there a change of top landing pages over time? Does the interest shift?
-- [ ] Which pages have a high exit rate?
-- [ ] What pages are most visited?
-- [ ] What pages trigger conversion action?
-- [ ] What are the loading speeds?
+- [x] What are the top landing pages? What are the keywords of the top landing pages? 
+- [x] What are the top keywords by location? Are there other locations with similar interest as indicated by keywords?
+- [x] Is there a change of top landing pages over time? Does the interest shift?
+- [x] Which pages have a high exit rate?
+- [x] What pages are most visited?
+- [x] What pages trigger conversion action?
+- [x] What are the loading speeds?
 
 ### Group 4) Actions/Conversions
-- [ ] What is the conversion rate (conversions/visitors)?
-- [ ] What are the most common conversion paths?
-- [ ] What is the average number of visits/steps required before a visitor converts?
-- [ ] Is the recent tracking sufficient/fitting the purpose? Define possible Goals and check if the data contains the corresponding information.
+- [x] What is the conversion rate (conversions/visitors)?
+- [x] What are the most common conversion paths?
+- [x] What is the average number of visits/steps required before a visitor converts?
+- [x] Is the recent tracking sufficient/fitting the purpose? Define possible Goals and check if the data contains the corresponding information.
 
 ### Collaboration
 * Working locally
