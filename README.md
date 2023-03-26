@@ -5,7 +5,7 @@ https://www.wirfuervielfalt.de/
 
 ## Final Report
 
-![image](https://user-images.githubusercontent.com/8211411/227771997-a8949965-c50b-4e9b-8f4b-f8539ce5e251.png)
+![image](https://user-images.githubusercontent.com/8211411/227772217-0fec12ca-c365-4e8c-94af-e8fde95cd196.png)
 
 ## Data Challenge
 
