@@ -1,6 +1,5 @@
-This folder contains the notebooks used for the analysis.
+This folder contains the notebooks used for the analysis:
 
-The notebooks are numbered in the order they should be executed.
 * [01_eda.ipynb](01_eda.ipynb): Exploratory data analysis, automatic data profiling with `ydata_profiling`.
 * [02_translation.ipynb](02_translation.ipynb): Translation of the column names.
 * [03_analysis.ipynb](03_analysis.ipynb): Analysis of the data. Indicators are calculated and the data is visualized.
